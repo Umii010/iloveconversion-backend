@@ -4,7 +4,7 @@ import { ref } from 'vue'
 const file = ref(null)
 const loading = ref(false)
 const progress = ref(0)
-const statusText = ref('') // Display API response or status
+const statusText = ref('') 
 
 const selectFile = (e) => {
   file.value = e.target.files[0]

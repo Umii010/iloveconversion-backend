@@ -1,174 +1,353 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 
 const file = ref(null)
 const loading = ref(false)
 const progress = ref(0)
 const statusText = ref('')
 const showStats = ref(false)
+const showErrorPopup = ref(false)
+const errorMessage = ref('')
 const compressionStats = ref({
   originalSize: 0,
   compressedSize: 0,
-  reductionPercent: 0
+  reductionPercent: 0,
+  compressionRatio: 0,
+  timeTaken: 0
 })
+const uploadTime = ref(null)
+const conversionStartTime = ref(null)
 
-const selectFile = (e) => {
-  file.value = e.target.files[0]
+// Check if filename contains problematic characters for GhostScript
+const hasProblematicCharacters = (filename) => {
+  const problematicPatterns = [
+    /\(.*\)/,       
+    /\[.*\]/,        
+    /\{.*\}/,        
+    /<.*>/,         
+    /\?/,           
+    /\*/,            
+    /\|/,            
+    /&/,            
+    /;/,             
+    /`/,             
+    /\$/,            
+    /#/,            
+    /%/,             
+    /\\/,           
+    /"/,            
+    /'/,            
+    /~/,            
+    /!/             
+  ]
+  
+  return problematicPatterns.some(pattern => pattern.test(filename))
 }
 
-// Format bytes to human readable format
+const getProblematicChars = (filename) => {
+  const problematic = []
+  const chars = filename.split('')
+  
+  chars.forEach(char => {
+    if ('()[]{}<>?*|&;`$#%\\"\''.includes(char)) {
+      if (!problematic.includes(char)) {
+        problematic.push(char)
+      }
+    }
+  })
+  
+  return problematic.join(', ')
+}
+
+// Computed properties
+const formattedFileSize = computed(() => {
+  if (!file.value) return ''
+  return formatBytes(file.value.size)
+})
+
+const estimatedTime = computed(() => {
+  if (!file.value) return 'Select a file'
+  const sizeMB = file.value.size / (1024 * 1024)
+  if (sizeMB < 1) return '~5-10 seconds'
+  if (sizeMB < 5) return '~10-20 seconds'
+  if (sizeMB < 20) return '~20-40 seconds'
+  if (sizeMB < 50) return '~40-60 seconds'
+  return '~1-2 minutes'
+})
+
+const isProblematicFile = computed(() => {
+  return file.value ? hasProblematicCharacters(file.value.name) : false
+})
+
+// Helper functions
 const formatBytes = (bytes) => {
-  if (bytes === 0) return '0 Bytes'
+  if (bytes === 0) return '0 B'
   const k = 1024
-  const sizes = ['Bytes', 'KB', 'MB', 'GB']
+  const sizes = ['B', 'KB', 'MB', 'GB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
+}
+
+const selectFile = (e) => {
+  const selectedFile = e.target.files[0]
+  if (selectedFile) {
+    if (selectedFile.type !== 'application/pdf') {
+      showError('Please select a PDF file')
+      return
+    }
+    
+    // Check for problematic filename
+    if (hasProblematicCharacters(selectedFile.name)) {
+      const problemChars = getProblematicChars(selectedFile.name)
+      showError(
+        `Filename contains special characters that may cause issues: ${problemChars}<br><br>` +
+        `Please rename the file to remove these characters before uploading.`
+      )
+      return
+    }
+    
+    file.value = selectedFile
+    uploadTime.value = new Date()
+    statusText.value = `File selected: ${selectedFile.name}`
+  }
+}
+
+const getCompressionQuality = (percent) => {
+  if (percent > 70) return 'Excellent'
+  if (percent > 50) return 'Very Good'
+  if (percent > 30) return 'Good'
+  if (percent > 10) return 'Moderate'
+  return 'Minimal'
+}
+
+const showError = (message) => {
+  errorMessage.value = message
+  showErrorPopup.value = true
+  
+  // Reset file input
+  file.value = null
+  const input = document.querySelector('input[type="file"]')
+  if (input) input.value = ''
+}
+
+const closeError = () => {
+  showErrorPopup.value = false
+  errorMessage.value = ''
 }
 
 const compressPdf = async () => {
   if (!file.value) {
-    alert('Please select a PDF file')
+    showError('Please select a PDF file')
+    return
+  }
+
+  // Double-check filename before processing
+  if (hasProblematicCharacters(file.value.name)) {
+    const problemChars = getProblematicChars(file.value.name)
+    showError(
+      `Cannot compress file with special characters: ${problemChars}<br><br>` +
+      `Please rename the file and try again.`
+    )
     return
   }
 
   loading.value = true
   progress.value = 0
-  statusText.value = 'Starting compression...'
+  statusText.value = 'Initializing compression...'
   showStats.value = false
+  conversionStartTime.value = Date.now()
 
   const formData = new FormData()
   formData.append('pdf', file.value)
 
-  let fakeProgress = null
-
   try {
-    // Simulate progress with better timing
-    fakeProgress = setInterval(() => {
-      if (progress.value < 85) {
-        progress.value += Math.random() * 5 + 2 // 2-7% increments
-        if (progress.value < 30) {
-          statusText.value = 'Uploading file...'
-        } else if (progress.value < 60) {
-          statusText.value = 'Processing PDF...'
-        } else {
-          statusText.value = 'Compressing images and fonts...'
-        }
-      }
-    }, 300)
+    // Progress simulation stages
+    const progressStages = [
+      { stage: 'Uploading file to server...', progress: 10, time: 500 },
+      { stage: 'Analyzing PDF structure...', progress: 20, time: 800 },
+      { stage: 'Optimizing images...', progress: 40, time: 1200 },
+      { stage: 'Compressing fonts...', progress: 60, time: 800 },
+      { stage: 'Rebuilding PDF...', progress: 80, time: 1000 },
+      { stage: 'Finalizing compression...', progress: 95, time: 500 }
+    ]
 
+    let currentStage = 0
+
+    // Start progress simulation
+    const updateProgress = () => {
+      if (currentStage < progressStages.length) {
+        const stage = progressStages[currentStage]
+        statusText.value = stage.stage
+        progress.value = stage.progress
+        
+        // Move to next stage after delay
+        setTimeout(() => {
+          currentStage++
+          if (currentStage < progressStages.length) {
+            updateProgress()
+          }
+        }, stage.time)
+      }
+    }
+
+    updateProgress()
+
+    // Make API call
     const res = await fetch('http://192.168.18.101:3000/api/compress-pdf', {
       method: 'POST',
       body: formData
     })
 
+    // Handle API errors
     if (!res.ok) {
-      throw new Error('Server error: ' + res.status)
+      let errorMsg = 'Compression failed'
+      try {
+        const errorData = await res.json()
+        errorMsg = errorData.message || errorMsg
+      } catch {
+        errorMsg = `Server error: ${res.status}`
+      }
+      
+      // Check if it's a GhostScript filename error
+      if (errorMsg.toLowerCase().includes('filename') || 
+          errorMsg.toLowerCase().includes('parentheses') ||
+          errorMsg.toLowerCase().includes('special characters')) {
+        showError(
+          `GhostScript cannot process files with special characters.<br><br>` +
+          `Please rename "${file.value.name}" to remove parentheses, brackets, or other special symbols.`
+        )
+      } else {
+        throw new Error(errorMsg)
+      }
+      return
     }
 
-    clearInterval(fakeProgress)
-    progress.value = 100
-    statusText.value = 'Finalizing compression...'
-
-    // CRITICAL: Read headers BEFORE consuming the response body
-    const apiFileName = res.headers.get('X-Original-Filename')
-    const fileName = apiFileName || file.value.name
+    // Get stats from headers
+    const originalSize = Number(res.headers.get('X-Original-Size')) || file.value.size
+    const compressedSize = Number(res.headers.get('X-Compressed-Size'))
+    const reductionPercent = res.headers.get('X-Reduction-Percent') || '0'
+    const compressionRatio = res.headers.get('X-Compression-Ratio') || '1.0'
     
-    let originalSize = Number(res.headers.get('X-Original-Size'))
-    let compressedSize = Number(res.headers.get('X-Compressed-Size'))
-    let reductionPercent = res.headers.get('X-Compression-Percent')
+    const endTime = Date.now()
+    const timeTaken = ((endTime - conversionStartTime.value) / 1000).toFixed(1)
 
-    console.log('Headers received:', {
+    // Calculate reduction if not provided
+    let calculatedPercent = parseFloat(reductionPercent)
+    if (calculatedPercent === 0 && originalSize > 0 && compressedSize > 0) {
+      calculatedPercent = ((1 - compressedSize / originalSize) * 100).toFixed(2)
+    }
+
+    // Store stats
+    compressionStats.value = {
+      fileName: file.value.name,
       originalSize,
       compressedSize,
-      reductionPercent,
-      allHeaders: Array.from(res.headers.entries())
-    })
-
-    // If headers are 0 or NaN, try to get from the file
-    if ((!originalSize || originalSize === 0) && file.value) {
-      originalSize = file.value.size
+      reductionPercent: calculatedPercent,
+      compressionRatio: parseFloat(compressionRatio).toFixed(2),
+      timeTaken: `${timeTaken} seconds`,
+      quality: getCompressionQuality(calculatedPercent),
+      timestamp: new Date().toLocaleTimeString()
     }
 
-    // Calculate percentage if not provided
-    if (!reductionPercent && originalSize > 0 && compressedSize > 0) {
-      reductionPercent = ((1 - compressedSize / originalSize) * 100).toFixed(2)
-    } else if (reductionPercent) {
-      reductionPercent = parseFloat(reductionPercent).toFixed(2)
-    } else {
-      reductionPercent = 'N/A'
-    }
+    progress.value = 100
+    statusText.value = 'Compression complete! Downloading...'
 
-    // Store stats for popup
-    compressionStats.value = {
-      originalSize: originalSize || 0,
-      compressedSize: compressedSize || 0,
-      reductionPercent: reductionPercent
-    }
-
-    console.log('Stats to display:', compressionStats.value)
-
-    // Now get the blob
+    // Get blob and download
     const blob = await res.blob()
-    
-    // Check blob size if compressedSize is not available
-    if (!compressedSize || compressedSize === 0) {
-      compressedSize = blob.size
-      compressionStats.value.compressedSize = blob.size
-      
-      // Recalculate percentage
-      if (originalSize > 0 && compressedSize > 0) {
-        reductionPercent = ((1 - compressedSize / originalSize) * 100).toFixed(2)
-        compressionStats.value.reductionPercent = reductionPercent
-      }
-    }
-
     const url = URL.createObjectURL(blob)
 
     const a = document.createElement('a')
     a.href = url
-    a.download = `compressed_${fileName}`
+    a.download = `compressed_${file.value.name}`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
 
-    statusText.value = 'Compression completed!'
-    
-    // Show stats popup after a brief delay
+    // Show success popup
     setTimeout(() => {
       showStats.value = true
-    }, 500)
+    }, 800)
 
-    // Reset input after download
-    file.value = null
-    const input = document.querySelector('input[type="file"]')
-    if (input) input.value = ''
-
-  } catch (err) {
-    statusText.value = 'Compression failed'
-    alert('Compression failed. Please try again.')
-    console.error('Error:', err)
-  } finally {
-    clearInterval(fakeProgress)
+    // Reset progress
     setTimeout(() => {
-      loading.value = false
       progress.value = 0
       statusText.value = ''
     }, 2000)
+
+  } catch (err) {
+    console.error('Compression error:', err)
+    statusText.value = `Error: ${err.message}`
+    
+    // Check for GhostScript specific errors
+    if (err.message.includes('undefinedfilename') || 
+        err.message.includes('parentheses') ||
+        err.message.includes('GhostScript')) {
+      showError(
+        `GhostScript cannot process this filename.<br><br>` +
+        `The file "${file.value.name}" contains special characters that GhostScript cannot handle.<br>` +
+        `Please rename the file to use only letters, numbers, dots, dashes, and underscores.`
+      )
+    } else {
+      showError(`Compression failed: ${err.message}`)
+    }
+  } finally {
+    loading.value = false
   }
 }
 
 const closeStats = () => {
   showStats.value = false
+  // Reset file
+  file.value = null
+  const input = document.querySelector('input[type="file"]')
+  if (input) input.value = ''
 }
 </script>
 
 <template>
   <div class="converter">
-    <h2>Compress PDF</h2>
-    <p class="subtitle">Reduce PDF file size without losing quality</p>
+    <h2>🗜️ PDF Compressor</h2>
+    <p class="subtitle">Reduce PDF file size while maintaining quality</p>
 
-    <label class="upload-box">
+    <!-- File Warning (if problematic) -->
+    <div v-if="file && isProblematicFile" class="file-warning">
+      <div class="warning-icon">⚠️</div>
+      <div class="warning-content">
+        <strong>Filename Issue Detected</strong>
+        <p>This file contains special characters ({{ getProblematicChars(file.name) }}) that may cause compression issues.</p>
+        <small>Consider renaming the file before compression.</small>
+      </div>
+    </div>
+
+    <!-- File Info Card -->
+    <div v-if="file && !isProblematicFile" class="file-info-card">
+      <div class="file-header">
+        <span class="file-icon">📄</span>
+        <div class="file-details">
+          <strong>{{ file.name }}</strong>
+          <small>{{ formattedFileSize }} • {{ estimatedTime }}</small>
+        </div>
+        <button v-if="!loading" @click="file = null" class="remove-btn">✕</button>
+      </div>
+      <div class="file-stats">
+        <span class="stat">
+          <span class="stat-label">Size:</span>
+          <span class="stat-value">{{ formattedFileSize }}</span>
+        </span>
+        <span class="stat">
+          <span class="stat-label">Est. Time:</span>
+          <span class="stat-value">{{ estimatedTime }}</span>
+        </span>
+        <span class="stat">
+          <span class="stat-label">Status:</span>
+          <span class="stat-value" style="color: #28a745;">Ready to compress</span>
+        </span>
+      </div>
+    </div>
+
+    <!-- Upload Area -->
+    <label v-if="!file" class="upload-box" @dragover.prevent @drop.prevent="selectFile">
       <input
         type="file"
         accept="application/pdf"
@@ -177,168 +356,348 @@ const closeStats = () => {
       />
       <div class="upload-content">
         <span class="icon">🗜️</span>
-        <p><strong>Click to upload</strong> a PDF file</p>
-        <small>{{ file ? file.name : 'No file selected' }}</small>
-        <small v-if="file" style="display: block; margin-top: 5px; color: #666;">
-          Size: {{ formatBytes(file.size) }}
-        </small>
+        <p><strong>Click to upload</strong> or drag & drop PDF</p>
+        <small>Max file size: 50MB </small><br>
+        <small>Avoid special characters in filenames</small>
+        <div class="filename-tips">
+          <small> Avoid: (), [], {}, &, ?, *, spaces, etc.</small>
+        </div>
       </div>
     </label>
 
-    <button class="merge-btn" @click="compressPdf" :disabled="loading">
-      {{ loading ? 'Compressing PDF...' : 'Compress PDF' }}
+    <!-- Compress Button -->
+    <button 
+      class="compress-btn" 
+      @click="compressPdf" 
+      :disabled="loading || !file || isProblematicFile"
+      :class="{ 
+        'loading': loading, 
+        'disabled': !file || isProblematicFile,
+        'warning': isProblematicFile
+      }"
+    >
+      <span v-if="!loading">
+        <span v-if="isProblematicFile">⚠️ Rename File First</span>
+        <span v-else>Compress PDF</span>
+      </span>
+      <span v-else>
+        <span class="spinner"></span> Compressing...
+      </span>
     </button>
 
-    <div v-if="loading" class="progress-container">
-      <p class="status-text">{{ statusText }}</p>
-      <div class="progress-wrapper">
-        <div class="progress-bar" :style="{ width: progress + '%' }"></div>
+    <!-- Progress Section -->
+    <div v-if="loading" class="progress-section">
+      <div class="progress-header">
+        <span>Compression Progress</span>
+        <span class="time-estimate">{{ estimatedTime }}</span>
       </div>
-      <small class="progress-percent">{{ Math.round(progress) }}%</small>
-      <small class="progress-estimate" v-if="progress < 90">
-        {{ progress < 50 ? 'Approx. 15-30 seconds remaining' : 'Almost done...' }}
-      </small>
+      
+      <div class="progress-container">
+        <div class="progress-bar" :style="{ width: progress + '%' }">
+          <span class="progress-text">{{ Math.round(progress) }}%</span>
+        </div>
+      </div>
+      
+      <p class="status-text">{{ statusText }}</p>
+      
+      <div class="progress-stats">
+        <span class="stat">Quality: {{ compressionStats.quality || 'Calculating...' }}</span>
+        <span class="stat">Stage: {{ Math.floor(progress / 20) + 1 }}/6</span>
+      </div>
     </div>
 
-    <!-- Stats Popup -->
-    <div v-if="showStats" class="stats-overlay" @click="closeStats">
-      <div class="stats-popup" @click.stop>
-        <button class="close-btn" @click="closeStats">×</button>
-        <h3>🎉 Compression Successful!</h3>
+    <!-- Success Popup -->
+    <div v-if="showStats" class="popup-overlay" @click.self="closeStats">
+      <div class="success-popup">
+        <div class="popup-header">
+          <span class="success-icon"></span>
+          <h3>Compression Successful !!</h3>
+          <button class="close-popup" @click="closeStats">✕</button>
+        </div>
         
-        <div class="stats-grid">
-          <div class="stat-item">
-            <div class="stat-label">Original Size</div>
-            <div class="stat-value">{{ formatBytes(compressionStats.originalSize) }}</div>
+        <div class="popup-content" v-if="compressionStats">
+          <div class="stats-summary">
+            <div class="summary-item">
+              <div class="summary-label">File Name</div>
+              <div class="summary-value">{{ compressionStats.fileName }}</div>
+            </div>
+            
+            <div class="size-comparison" v-if="compressionStats.originalSize > 0 && compressionStats.compressedSize > 0">
+              <div class="size-bar original">
+                <span class="size-label">Original</span>
+                <span class="size-value">{{ formatBytes(compressionStats.originalSize) }}</span>
+              </div>
+              <div class="size-bar compressed" 
+                   :style="{ width: Math.max(20, (100 - compressionStats.reductionPercent)) + '%' }">
+                <span class="size-label">Compressed</span>
+                <span class="size-value">{{ formatBytes(compressionStats.compressedSize) }}</span>
+              </div>
+              <div class="size-reduction">
+                <span class="reduction-label">Reduction:</span>
+                <span class="reduction-value">{{ compressionStats.reductionPercent }}%</span>
+              </div>
+            </div>
+            
+            <div class="stats-grid">
+              <div class="stat-item">
+                <div class="stat-label">Time Taken</div>
+                <div class="stat-value">{{ compressionStats.timeTaken }}</div>
+              </div>
+              <div class="stat-item highlight">
+                <div class="stat-label">Quality</div>
+                <div class="stat-value">{{ compressionStats.quality }}</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-label">Compression Ratio</div>
+                <div class="stat-value">1:{{ compressionStats.compressionRatio }}</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-label">Completed</div>
+                <div class="stat-value">{{ compressionStats.timestamp }}</div>
+              </div>
+            </div>
           </div>
-          <div class="stat-item">
-            <div class="stat-label">Compressed Size</div>
-            <div class="stat-value">{{ formatBytes(compressionStats.compressedSize) }}</div>
-          </div>
-          <div class="stat-item highlight" v-if="compressionStats.reductionPercent !== 'N/A'">
-            <div class="stat-label">Reduction</div>
-            <div class="stat-value">{{ compressionStats.reductionPercent }}%</div>
-          </div>
-          <div class="stat-item highlight" v-else>
-            <div class="stat-label">Reduction</div>
-            <div class="stat-value">Calculating...</div>
+          
+          <div class="popup-actions">
+            <button class="btn-primary" @click="closeStats">Compress Another</button>
+            <button class="btn-secondary" @click="closeStats">Close</button>
           </div>
         </div>
+      </div>
+    </div>
 
-        <div class="size-comparison" v-if="compressionStats.reductionPercent !== 'N/A'">
-          <div class="size-bar original" 
-               :style="{ width: '100%' }">
-            <span>Original</span>
-          </div>
-          <div class="size-bar compressed" 
-               :style="{ width: Math.max(10, (100 - parseFloat(compressionStats.reductionPercent || 0))) + '%' }">
-            <span>Compressed</span>
-          </div>
+    <!-- Error Popup -->
+    <div v-if="showErrorPopup" class="popup-overlay" @click.self="closeError">
+      <div class="error-popup">
+        <div class="popup-header error">
+          <span class="error-icon">❌</span>
+          <h3>File Name Issue</h3>
+          <button class="close-popup" @click="closeError">✕</button>
         </div>
-        <div v-else class="size-comparison-placeholder">
-          <p>Size comparison not available</p>
-        </div>
-
-        <p class="stats-tip">
-          File has been downloaded automatically !!!<br> Thanks for using our service.
-        </p>
         
-        <button class="ok-btn" @click="closeStats">OK</button>
+        <div class="popup-content">
+          <div class="error-content" v-html="errorMessage"></div>
+          
+          <div class="filename-guidelines">
+            <h4>Filename Guidelines:</h4>
+            <div class="guidelines-list">
+              <div class="guideline allowed">
+                <span class="guideline-icon">✅</span>
+                <span class="guideline-text"><strong>Allowed:</strong> my-document.pdf, report_2024.pdf, file123.pdf</span>
+              </div>
+              <div class="guideline not-allowed">
+                <span class="guideline-icon">❌</span>
+                <span class="guideline-text"><strong>Not Allowed:</strong> file (1).pdf, document[2].pdf, report&summary.pdf</span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="popup-actions">
+            <button class="btn-primary" @click="closeError">OK, I'll Rename</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-/* Add this new style */
-.size-comparison-placeholder {
-  margin: 25px 0;
-  padding: 20px;
-  background: #f8f9fa;
-  border-radius: 8px;
-  color: #666;
-  font-size: 14px;
-}
-
-/* Rest of the styles remain the same */
 .converter {
-  text-align: center;
-  position: relative;
+  max-width: 500px;
+  margin: 0 auto;
+  padding: 20px;
 }
 
 .converter h2 {
-  font-size: 22px;
-  margin-bottom: 4px;
+  font-size: 24px;
+  margin-bottom: 8px;
+  color: #2c3e50;
 }
 
 .subtitle {
   font-size: 14px;
   color: #666;
+  margin-bottom: 25px;
+}
+
+.file-info-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 12px;
+  padding: 16px;
   margin-bottom: 20px;
 }
 
+.file-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.file-icon {
+  font-size: 24px;
+}
+
+.file-details {
+  flex: 1;
+  text-align: left;
+}
+
+.file-details strong {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 2px;
+}
+
+.file-details small {
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.remove-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.remove-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.file-stats {
+  display: flex;
+  gap: 20px;
+  font-size: 13px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.stat {
+  display: flex;
+  gap: 6px;
+}
+
+.stat-label {
+  opacity: 0.9;
+}
+
+/* Upload Box */
 .upload-box {
   display: block;
   border: 2px dashed #aaa;
   border-radius: 12px;
-  padding: 30px 20px;
+  padding: 40px 20px;
   cursor: pointer;
   background: #f9f9f9;
   transition: all 0.3s ease;
+  margin-bottom: 20px;
 }
 
 .upload-box:hover {
-  border-color: #107667;
-  background: #eef7f5;
+  border-color: #667eea;
+  background: #f0f4ff;
 }
 
 .upload-content .icon {
-  font-size: 36px;
+  font-size: 40px;
   display: block;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
-.merge-btn {
+.upload-content p {
+  margin: 8px 0;
+  font-size: 16px;
+  color: #2c3e50;
+}
+
+.upload-content small {
+  color: #6c757d;
+  font-size: 13px;
+}
+
+/* Compress Button */
+.compress-btn {
   width: 100%;
-  padding: 12px;
-  font-size: 15px;
+  padding: 16px;
+  font-size: 16px;
   border-radius: 10px;
-  margin-top: 20px;
   border: none;
   cursor: pointer;
-  background: rgb(238, 108, 77);
-  color: #fff;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
   font-weight: 600;
   transition: all 0.3s ease;
+  margin-top: 10px;
 }
 
-.merge-btn:hover:not(:disabled) {
-  background: rgb(220, 95, 65);
+.compress-btn:hover:not(:disabled):not(.disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(238, 108, 77, 0.3);
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
 }
 
-.merge-btn:disabled {
-  opacity: 0.6;
+.compress-btn:disabled, .compress-btn.disabled {
+  background: #ccc;
   cursor: not-allowed;
+  transform: none;
+}
+
+.compress-btn.loading {
+  background: #6c757d;
+}
+
+.spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255,255,255,.3);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: spin 1s ease-in-out infinite;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Progress Section */
+.progress-section {
+  margin-top: 30px;
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 12px;
+  border: 1px solid #e9ecef;
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  font-size: 14px;
+  color: #2c3e50;
+}
+
+.time-estimate {
+  background: #e9ecef;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  color: #495057;
 }
 
 .progress-container {
-  margin-top: 20px;
-  padding: 15px;
-  background: #f8f9fa;
-  border-radius: 10px;
-}
-
-.status-text {
-  margin-bottom: 10px;
-  font-size: 14px;
-  color: #444;
-  font-weight: 500;
-}
-
-.progress-wrapper {
-  height: 10px;
+  height: 12px;
   width: 100%;
   background: #e9ecef;
   border-radius: 8px;
@@ -348,28 +707,39 @@ const closeStats = () => {
 
 .progress-bar {
   height: 100%;
-  background: linear-gradient(90deg, rgb(238, 108, 77), rgb(255, 140, 100));
+  background: linear-gradient(90deg, #667eea, #764ba2);
   transition: width 0.3s ease;
-  border-radius: 8px;
+  position: relative;
 }
 
-.progress-percent {
-  display: block;
-  margin-top: 8px;
+.progress-text {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  color: white;
+  font-weight: bold;
+  text-shadow: 1px 1px 1px rgba(0,0,0,0.2);
+}
+
+.status-text {
+  margin-top: 12px;
+  font-size: 14px;
+  color: #495057;
+  min-height: 20px;
+}
+
+.progress-stats {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 15px;
   font-size: 12px;
-  color: #666;
+  color: #6c757d;
 }
 
-.progress-estimate {
-  display: block;
-  margin-top: 5px;
-  font-size: 11px;
-  color: #888;
-  font-style: italic;
-}
-
-/* Stats Popup Styles */
-.stats-overlay {
+/* Success Popup */
+.popup-overlay {
   position: fixed;
   top: 0;
   left: 0;
@@ -380,82 +750,142 @@ const closeStats = () => {
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  animation: fadeIn 0.3s ease;
+  backdrop-filter: blur(3px);
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.stats-popup {
+.success-popup {
   background: white;
   border-radius: 16px;
-  padding: 30px;
   width: 90%;
-  max-width: 400px;
-  position: relative;
-  animation: slideUp 0.3s ease;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  max-width: 500px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  animation: popupIn 0.3s ease-out;
 }
 
-@keyframes slideUp {
+@keyframes popupIn {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(20px) scale(0.95);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 
-.close-btn {
-  position: absolute;
-  top: 15px;
-  right: 20px;
-  background: none;
-  border: none;
+.popup-header {
+  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+  color: white;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.popup-header h3 {
+  margin: 0;
+  flex: 1;
+  text-align: center;
+  font-size: 18px;
+}
+
+.success-icon {
   font-size: 24px;
-  cursor: pointer;
-  color: #888;
+}
+
+.close-popup {
+  background: rgba(255,255,255,0.2);
+  border: none;
+  color: white;
   width: 30px;
   height: 30px;
   border-radius: 50%;
+  cursor: pointer;
+  font-size: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.close-btn:hover {
-  background: #f5f5f5;
-  color: #333;
+.close-popup:hover {
+  background: rgba(255,255,255,0.3);
 }
 
-.stats-popup h3 {
-  margin-top: 0;
-  margin-bottom: 25px;
-  color: #333;
-  font-size: 20px;
+.popup-content {
+  padding: 24px;
+}
+
+.stats-summary {
+  margin-bottom: 24px;
+}
+
+.summary-item {
+  margin-bottom: 20px;
+}
+
+.summary-label {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 4px;
+}
+
+.summary-value {
+  font-size: 14px;
+  color: #2c3e50;
+  font-weight: 500;
+  word-break: break-all;
+}
+
+.size-comparison {
+  margin: 25px 0;
+  position: relative;
+}
+
+.size-bar {
+  height: 35px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 15px;
+  color: white;
+  font-weight: 600;
+  font-size: 13px;
+  transition: width 0.8s ease;
+}
+
+.size-bar.original {
+  background: linear-gradient(90deg, #6c757d, #495057);
+  width: 100%;
+}
+
+.size-bar.compressed {
+  background: linear-gradient(90deg, #28a745, #20c997);
+  position: absolute;
+  top: 0;
+  left: 0;
+  min-width: 80px;
 }
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 15px;
-  margin-bottom: 25px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-top: 25px;
 }
 
 .stat-item {
   background: #f8f9fa;
-  padding: 15px 10px;
+  padding: 15px;
   border-radius: 10px;
   text-align: center;
 }
 
 .stat-item.highlight {
-  background: linear-gradient(135deg, #eef7f5, #d4f1eb);
-  border: 2px solid #107667;
+  background: linear-gradient(135deg, #e8f5e9, #d4edda);
+  border: 2px solid #28a745;
 }
 
 .stat-label {
@@ -468,64 +898,41 @@ const closeStats = () => {
 .stat-value {
   font-size: 18px;
   font-weight: 700;
-  color: #333;
+  color: #2c3e50;
 }
 
-.size-comparison {
-  margin: 25px 0;
-  position: relative;
-  height: 40px;
-}
-
-.size-bar {
-  height: 30px;
-  border-radius: 6px;
-  margin-bottom: 8px;
+.popup-actions {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-weight: 600;
-  font-size: 12px;
-  transition: width 0.8s ease;
+  gap: 12px;
+  margin-top: 20px;
 }
 
-.size-bar.original {
-  background: linear-gradient(90deg, #6c757d, #495057);
-}
-
-.size-bar.compressed {
-  background: linear-gradient(90deg, rgb(238, 108, 77), rgb(255, 140, 100));
-  position: absolute;
-  top: 0;
-  left: 0;
-}
-
-.stats-tip {
-  font-size: 13px;
-  color: #28a745;
-  background: #e8f5e9;
-  padding: 10px;
-  border-radius: 8px;
-  margin: 20px 0;
-}
-
-.ok-btn {
-  width: 100%;
+.btn-primary, .btn-secondary {
+  flex: 1;
   padding: 12px;
-  background: rgb(238, 108, 77);
-  color: white;
+  border-radius: 8px;
   border: none;
-  border-radius: 10px;
-  font-size: 16px;
-  font-weight: 600;
   cursor: pointer;
+  font-weight: 500;
   transition: all 0.3s ease;
 }
 
-.ok-btn:hover {
-  background: rgb(220, 95, 65);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(238, 108, 77, 0.3);
+.btn-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
 }
+
+.btn-primary:hover {
+  opacity: 0.9;
+}
+
+.btn-secondary {
+  background: #6c757d;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background: #5a6268;
+}
+
 </style>

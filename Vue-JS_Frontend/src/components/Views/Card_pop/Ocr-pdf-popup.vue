@@ -257,42 +257,6 @@ OCR technology continues to improve with advancements in machine learning and ar
       </div>
     </label>
 
-    <!-- OCR Settings -->
-    <div v-if="file" class="ocr-settings">
-      <div class="settings-grid">
-        <div class="setting-group">
-          <label for="language">Language</label>
-          <select id="language" v-model="selectedLanguage" class="setting-select">
-            <option v-for="lang in languages" :key="lang.code" :value="lang.code">
-              {{ lang.name }}
-            </option>
-          </select>
-          <p class="setting-desc">Select the language of text in your document</p>
-        </div>
-
-        <div class="setting-group">
-          <label for="format">Output Format</label>
-          <select id="format" v-model="outputFormat" class="setting-select">
-            <option v-for="format in formats" :key="format.id" :value="format.id">
-              {{ format.name }}
-            </option>
-          </select>
-          <p class="setting-desc">{{ formats.find(f => f.id === outputFormat)?.desc }}</p>
-        </div>
-      </div>
-
-      <div class="supported-formats">
-        <p><strong>Supported File Types:</strong></p>
-        <div class="format-badges">
-          <span class="badge">PDF</span>
-          <span class="badge">JPG</span>
-          <span class="badge">PNG</span>
-          <span class="badge">TIFF</span>
-          <span class="badge">BMP</span>
-        </div>
-      </div>
-    </div>
-
     <!-- Extracted Text Preview -->
     <div v-if="showTextPreview && extractedText" class="text-preview">
       <div class="preview-header">
@@ -316,31 +280,6 @@ OCR technology continues to improve with advancements in machine learning and ar
       </div>
     </div>
 
-    <!-- Demo Preview (shown when no real text yet) -->
-    <div v-if="file && !showTextPreview" class="demo-preview">
-      <h3>How OCR Works</h3>
-      <div class="demo-steps">
-        <div class="step">
-          <div class="step-icon">1</div>
-          <p><strong>Upload</strong> your scanned document or image</p>
-        </div>
-        <div class="step">
-          <div class="step-icon">2</div>
-          <p><strong>OCR Processing</strong> extracts text using AI</p>
-        </div>
-        <div class="step">
-          <div class="step-icon">3</div>
-          <p><strong>Download</strong> searchable PDF or text file</p>
-        </div>
-      </div>
-      
-      <div class="sample-output">
-        <h4>Sample Output:</h4>
-        <div class="sample-text">
-          <p>"OCR technology converts scanned documents into editable and searchable text, making your files more accessible and useful."</p>
-        </div>
-      </div>
-    </div>
 
     <!-- Action Buttons -->
     <div class="action-buttons">

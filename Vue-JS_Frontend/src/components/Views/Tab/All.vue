@@ -49,10 +49,10 @@ const CardComponent = ref(null)
 
 const components = {
   Merge_popup,
-    Split_popup,
+    // Split_popup,
     Compress_popup,
     Pdf_to_word_popup,
-    Word_to_pdf_popup,
+    // Word_to_pdf_popup,
     Pdf_to_Png_popup,
     Images_to_pdf_popup,
     Protect_pdf_popup,
@@ -66,56 +66,33 @@ const components = {
   Pdf_to_excel_popup,
   Repair_pdf_popup,
   Sign_pdf_popup,
-  Add_page_number_popup,
-  Split_pdf_popup
+  Add_page_number_popup
+  // Split_pdf_popup
 }
 
 </script>
 <template>
   <div class="all__page">
     <div class="card--section">
-      <!-- Merge Card -->
       <Merge_PDF @click="CardComponent = 'Merge_popup'"/>
-      <!-- Split Card -->
-      <Split_PDF @click="CardComponent = 'Split_popup'"/>
-      <!-- Compress Card -->
       <Compress_PDF @click="CardComponent = 'Compress_popup'"/>
-      <!--Pdf To Word-->
       <Pdf_to_word  @click="CardComponent = 'Pdf_to_word_popup'"/>
-      <!--Word to PDF-->
-      <Word_to_pdf  @click="CardComponent = 'Word_to_pdf_popup'"/>
-      <!--Pdf To Png Popup-->
+      <!-- <Word_to_pdf  @click="CardComponent = 'Word_to_pdf_popup'"/> -->
       <Pdf_to_Png @click="CardComponent = 'Pdf_to_Png_popup'"/>
-
-      <!--Jpg to PDF Popup-->
       <Images_to_pdf @click="CardComponent = 'Images_to_pdf_popup'"/>
-
-      <!--Protect PDF-->
       <Protect_PDF @click="CardComponent = 'Protect_pdf_popup'"/>
-      <!--Unlock PDF-->
       <Unlock_PDF @click="CardComponent = 'Unlock_pdf_popup'"/>
-
-      <Rotate_PDF @click="CardComponent = 'Rotate_pdf_popup'"/>
-      <Crop_PDF @click="CardComponent = 'CropPdfPopup'"/>
+      <!-- <Rotate_PDF @click="CardComponent = 'Rotate_pdf_popup'"/> -->
+      <!-- <Crop_PDF @click="CardComponent = 'CropPdfPopup'"/> -->
       <OCR_PDF @click="CardComponent = 'Ocrpdfpopup'"/>
-      <Organize_PDF @click="CardComponent = 'OrganizePdfPopup'"/>
+      <!-- <Organize_PDF @click="CardComponent = 'OrganizePdfPopup'"/> -->
       <PDFtoppt @click="CardComponent = 'Pdf_to_ppt_popup'"/>
       <PPttopdf @click="CardComponent = 'PPt_to_pdf_popup'"/>
       <Pdftoexcel @click="CardComponent = 'Pdf_to_excel_popup'"/>
       <Repairpdf @click="CardComponent = 'Repair_pdf_popup'"/>
-      <Signpdf @click="CardComponent = 'Sign_pdf_popup'"/>
-      <AddPageNumber @click="CardComponent = 'Add_page_number_popup'"/>
-      <SplitPdf @click="CardComponent = 'Split_pdf_popup'"/>
-
-
-
-
-
-
-
-
-
-
+      <!-- <Signpdf @click="CardComponent = 'Sign_pdf_popup'"/> -->
+      <!-- <AddPageNumber @click="CardComponent = 'Add_page_number_popup'"/>
+      <SplitPdf @click="CardComponent = 'Split_pdf_popup'"/> -->
     </div>
     <div class="popup--section" v-if="CardComponent">
   <div class="popup-overlay" @click="CardComponent = null"></div>

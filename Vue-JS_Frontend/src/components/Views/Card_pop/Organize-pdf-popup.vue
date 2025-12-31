@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 
 const file = ref(null)
 const loading = ref(false)
@@ -9,23 +9,42 @@ const statusText = ref('')
 // Page management
 const pages = ref([])
 const selectedPages = ref(new Set())
+const currentPage = ref(1)
 const isDragging = ref(false)
 const dragStartIndex = ref(null)
 const dragOverIndex = ref(null)
 
 // View settings
 const viewMode = ref('grid') // 'grid' or 'list'
-const pageSize = ref('medium') // 'small', 'medium', 'large'
 const showThumbnails = ref(true)
+const showPageNumbers = ref(true)
+const itemsPerPage = ref(12) // Pagination
+const currentPageIndex = ref(1)
 
 // Actions
 const actions = ref([
-  { id: 'rotate-right', name: 'Rotate Right', icon: '↻', color: '#4a6fa5' },
-  { id: 'rotate-left', name: 'Rotate Left', icon: '↺', color: '#4a6fa5' },
-  { id: 'delete', name: 'Delete', icon: '🗑️', color: '#e74c3c' },
-  { id: 'duplicate', name: 'Duplicate', icon: '📄', color: '#2ecc71' },
-  { id: 'extract', name: 'Extract', icon: '📤', color: '#f39c12' }
+  { id: 'rotate-right', name: '↻', title: 'Rotate Right', color: '#4a6fa5' },
+  { id: 'rotate-left', name: '↺', title: 'Rotate Left', color: '#4a6fa5' },
+  { id: 'delete', name: '🗑️', title: 'Delete', color: '#e74c3c' },
+  { id: 'duplicate', name: '📄', title: 'Duplicate', color: '#2ecc71' },
+  { id: 'extract', name: '📤', title: 'Extract', color: '#f39c12' }
 ])
+
+// Pagination
+const totalPages = computed(() => Math.ceil(pages.value.length / itemsPerPage.value))
+const paginatedPages = computed(() => {
+  const start = (currentPageIndex.value - 1) * itemsPerPage.value
+  const end = start + itemsPerPage.value
+  return pages.value.slice(start, end)
+})
+
+// Selection stats
+const selectionStats = computed(() => ({
+  total: pages.value.length,
+  selected: selectedPages.value.size,
+  rotated: pages.value.filter(p => p.rotation !== 0).length,
+  currentRange: `${(currentPageIndex.value - 1) * itemsPerPage.value + 1}-${Math.min(currentPageIndex.value * itemsPerPage.value, pages.value.length)}`
+}))
 
 const selectFile = async (e) => {
   const selectedFile = e.target.files[0]
@@ -34,39 +53,39 @@ const selectFile = async (e) => {
   file.value = selectedFile
   console.log('File selected for organization:', selectedFile.name)
   
-  // Generate dummy page data (in real app, you'd extract from PDF)
+  // Generate dummy page data
   generateSamplePages()
 }
 
 const generateSamplePages = () => {
   pages.value = []
-  const totalPages = 8 // Sample number of pages
+  const totalPages = 24 // Sample number of pages
   
   for (let i = 1; i <= totalPages; i++) {
     pages.value.push({
       id: i,
       number: i,
       label: `Page ${i}`,
-      rotation: 0, // 0, 90, 180, 270 degrees
+      rotation: 0,
       selected: false,
-      thumbnail: `https://via.placeholder.com/150x200/4a6fa5/ffffff?text=Page+${i}`,
-      content: `Content of page ${i}`,
+      thumbnail: `https://via.placeholder.com/120x170/4a6fa5/ffffff?text=P${i}`,
       size: 'A4',
-      dimensions: '595 × 842 points'
+      dimensions: '595 × 842'
     })
   }
+  currentPageIndex.value = 1
 }
 
 // Page selection
 const togglePageSelection = (pageId, event) => {
-  if (event && (event.ctrlKey || event.metaKey)) {
+  if (event?.ctrlKey || event?.metaKey) {
     // Multi-select with Ctrl/Cmd
     if (selectedPages.value.has(pageId)) {
       selectedPages.value.delete(pageId)
     } else {
       selectedPages.value.add(pageId)
     }
-  } else if (event && event.shiftKey) {
+  } else if (event?.shiftKey) {
     // Range selection with Shift
     const pageIds = pages.value.map(p => p.id)
     const startIndex = pageIds.indexOf(Array.from(selectedPages.value)[0] || pageId)
@@ -91,6 +110,17 @@ const selectAllPages = () => {
   pages.value.forEach(page => {
     selectedPages.value.add(page.id)
   })
+  updatePageSelection()
+}
+
+const selectCurrentPage = () => {
+  const startIndex = (currentPageIndex.value - 1) * itemsPerPage.value
+  const endIndex = Math.min(startIndex + itemsPerPage.value, pages.value.length)
+  
+  selectedPages.value.clear()
+  for (let i = startIndex; i < endIndex; i++) {
+    selectedPages.value.add(pages.value[i].id)
+  }
   updatePageSelection()
 }
 
@@ -138,7 +168,6 @@ const rotatePages = (pageIds, angle) => {
     if (pageIds.includes(page.id)) {
       page.rotation = (page.rotation + angle) % 360
       if (page.rotation < 0) page.rotation += 360
-      page.label = `Page ${page.number} (${page.rotation}°)`
     }
   })
 }
@@ -146,7 +175,6 @@ const rotatePages = (pageIds, angle) => {
 const deletePages = (pageIds) => {
   if (!confirm(`Delete ${pageIds.length} selected page(s)?`)) return
   
-  // Filter out deleted pages
   pages.value = pages.value.filter(page => !pageIds.includes(page.id))
   
   // Re-number remaining pages
@@ -156,15 +184,20 @@ const deletePages = (pageIds) => {
   })
   
   selectedPages.value.clear()
+  
+  // Adjust current page if needed
+  if (currentPageIndex.value > totalPages.value) {
+    currentPageIndex.value = totalPages.value
+  }
 }
 
 const duplicatePages = (pageIds) => {
   const pagesToDuplicate = pages.value.filter(page => pageIds.includes(page.id))
   const newPages = pagesToDuplicate.map(page => ({
     ...page,
-    id: Date.now() + Math.random(), // New unique ID
+    id: Date.now() + Math.random(),
     number: pages.value.length + 1,
-    label: `Page ${pages.value.length + 1} (copy)`,
+    label: `Page ${pages.value.length + 1}`,
     selected: false
   }))
   
@@ -195,15 +228,17 @@ const onDragOver = (index, event) => {
 const onDrop = (index, event) => {
   event.preventDefault()
   if (dragStartIndex.value !== null && dragStartIndex.value !== index) {
+    const actualStartIndex = (currentPageIndex.value - 1) * itemsPerPage.value + dragStartIndex.value
+    const actualDropIndex = (currentPageIndex.value - 1) * itemsPerPage.value + index
+    
     // Reorder pages
-    const movedPage = pages.value[dragStartIndex.value]
-    pages.value.splice(dragStartIndex.value, 1)
-    pages.value.splice(index, 0, movedPage)
+    const movedPage = pages.value[actualStartIndex]
+    pages.value.splice(actualStartIndex, 1)
+    pages.value.splice(actualDropIndex, 0, movedPage)
     
     // Update page numbers
     pages.value.forEach((page, idx) => {
       page.number = idx + 1
-      page.label = page.rotation === 0 ? `Page ${page.number}` : `Page ${page.number} (${page.rotation}°)`
     })
   }
   
@@ -212,55 +247,23 @@ const onDrop = (index, event) => {
   isDragging.value = false
 }
 
-const movePage = (fromIndex, toIndex) => {
-  if (fromIndex === toIndex) return
-  
-  const movedPage = pages.value[fromIndex]
-  pages.value.splice(fromIndex, 1)
-  pages.value.splice(toIndex, 0, movedPage)
-  
-  // Update page numbers
-  pages.value.forEach((page, idx) => {
-    page.number = idx + 1
-    page.label = page.rotation === 0 ? `Page ${page.number}` : `Page ${page.number} (${page.rotation}°)`
-  })
-}
-
-const movePageUp = (index) => {
-  if (index > 0) {
-    movePage(index, index - 1)
+// Pagination
+const goToPage = (page) => {
+  if (page >= 1 && page <= totalPages.value) {
+    currentPageIndex.value = page
   }
 }
 
-const movePageDown = (index) => {
-  if (index < pages.value.length - 1) {
-    movePage(index, index + 1)
+const nextPage = () => {
+  if (currentPageIndex.value < totalPages.value) {
+    currentPageIndex.value++
   }
 }
 
-const moveToTop = (index) => {
-  if (index > 0) {
-    movePage(index, 0)
+const prevPage = () => {
+  if (currentPageIndex.value > 1) {
+    currentPageIndex.value--
   }
-}
-
-const moveToBottom = (index) => {
-  if (index < pages.value.length - 1) {
-    movePage(index, pages.value.length - 1)
-  }
-}
-
-// View settings
-const toggleViewMode = () => {
-  viewMode.value = viewMode.value === 'grid' ? 'list' : 'grid'
-}
-
-const changePageSize = (size) => {
-  pageSize.value = size
-}
-
-const toggleThumbnails = () => {
-  showThumbnails.value = !showThumbnails.value
 }
 
 // Organize PDF (send to backend)
@@ -277,15 +280,14 @@ const organizePdf = async () => {
 
   loading.value = true
   progress.value = 0
-  statusText.value = 'Preparing organization data...'
+  statusText.value = 'Preparing organization...'
 
-  // Prepare organization data
   const organizationData = {
     pages: pages.value.map(page => ({
       originalNumber: page.id,
       newNumber: page.number,
       rotation: page.rotation,
-      action: 'keep' // In real app, could be 'keep', 'delete', 'rotate', etc.
+      action: 'keep'
     })),
     order: pages.value.map(page => page.number)
   }
@@ -301,7 +303,6 @@ const organizePdf = async () => {
       if (progress.value < 90) progress.value += 5
     }, 150)
 
-    // Call organize API
     const res = await fetch('http://192.168.18.101:3000/api/organize-pdf', {
       method: 'POST',
       body: formData
@@ -316,7 +317,6 @@ const organizePdf = async () => {
     progress.value = 100
     statusText.value = 'Downloading organized PDF...'
 
-    // Get filename
     const contentDisposition = res.headers.get('content-disposition')
     let fileName = `organized_${file.value.name}`
     
@@ -327,7 +327,6 @@ const organizePdf = async () => {
       }
     }
 
-    // Download the organized PDF
     const blob = await res.blob()
     const url = URL.createObjectURL(blob)
 
@@ -339,10 +338,10 @@ const organizePdf = async () => {
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
 
-    statusText.value = 'Organization completed!'
+    statusText.value = '✅ Organization completed!'
 
   } catch (err) {
-    statusText.value = 'Organization failed'
+    statusText.value = '❌ Organization failed'
     alert('Organization failed: ' + err.message)
     console.error('Organization error:', err)
   } finally {
@@ -360,6 +359,7 @@ const resetOrganization = () => {
     file.value = null
     pages.value = []
     selectedPages.value.clear()
+    currentPageIndex.value = 1
     const input = document.querySelector('input[type="file"]')
     if (input) input.value = ''
   }
@@ -381,6 +381,9 @@ onMounted(() => {
     if (e.key === 'Escape') {
       clearSelection()
     }
+    // Arrow keys for navigation
+    if (e.key === 'ArrowRight') nextPage()
+    if (e.key === 'ArrowLeft') prevPage()
   }
 
   window.addEventListener('keydown', handleKeyDown)
@@ -393,8 +396,8 @@ onUnmounted(() => {
 
 <template>
   <div class="converter">
-    <h2>Organize PDF</h2>
-    <p class="subtitle">Drag and drop to reorder pages, rotate, delete, or organize your PDF</p>
+    <h2>📑 Organize PDF Pages</h2>
+    <p class="subtitle">Rearrange, rotate, delete or extract pages from your PDF</p>
 
     <!-- File Upload -->
     <label class="upload-box" v-if="!file">
@@ -405,203 +408,244 @@ onUnmounted(() => {
         hidden
       />
       <div class="upload-content">
-        <span class="icon">📑</span>
-        <p><strong>Click to upload</strong> a PDF file</p>
-        <small>{{ file ? file.name : 'No file selected' }}</small>
+        <span class="icon">📄</span>
+        <p><strong>Upload PDF</strong></p>
+        <small>Drag & drop or click to browse</small>
       </div>
     </label>
 
     <!-- Organization Interface -->
     <div v-if="file" class="organization-interface">
-      <!-- Header with file info and controls -->
-      <div class="org-header">
-        <div class="file-info">
-          <h3>{{ file.name }}</h3>
-          <p>{{ pages.length }} page(s) • Drag to reorder</p>
-        </div>
-        <div class="header-controls">
-          <div class="selection-info">
-            <span v-if="selectedPages.size > 0">
-              {{ selectedPages.size }} page(s) selected
-            </span>
-            <span v-else>No pages selected</span>
+      <!-- Compact Header -->
+      <div class="compact-header">
+        <div class="header-left">
+          <div class="file-badge">
+            <span class="file-icon">📄</span>
+            <div class="file-details">
+              <strong>{{ file.name }}</strong>
+              <small>{{ selectionStats.total }} pages</small>
+            </div>
           </div>
-          <div class="view-controls">
+        </div>
+        
+        <div class="header-center">
+          <div class="selection-badge" v-if="selectionStats.selected > 0">
+            <span class="selected-count">{{ selectionStats.selected }}</span>
+            <span>selected</span>
+          </div>
+          <div class="selection-badge rotated" v-if="selectionStats.rotated > 0">
+            <span class="rotated-count">{{ selectionStats.rotated }}</span>
+            <span>rotated</span>
+          </div>
+        </div>
+        
+        <div class="header-right">
+          <div class="view-toggle">
             <button 
-              @click="toggleViewMode" 
-              class="view-btn"
-              :title="viewMode === 'grid' ? 'Switch to list view' : 'Switch to grid view'"
-            >
-              {{ viewMode === 'grid' ? '📋 List' : '🖼️ Grid' }}
-            </button>
-            <button 
-              @click="toggleThumbnails" 
+              @click="showThumbnails = !showThumbnails" 
               class="view-btn"
               :title="showThumbnails ? 'Hide thumbnails' : 'Show thumbnails'"
             >
-              {{ showThumbnails ? '👁️ Hide' : '👁️ Show' }}
+              {{ showThumbnails ? '👁️' : '👁️‍🗨️' }}
             </button>
-            <div class="size-controls">
-              <button 
-                v-for="size in ['small', 'medium', 'large']" 
-                :key="size"
-                @click="changePageSize(size)"
-                :class="['size-btn', { active: pageSize === size }]"
-                :title="size.charAt(0).toUpperCase() + size.slice(1) + ' thumbnails'"
-              >
-                {{ size.charAt(0).toUpperCase() }}
-              </button>
-            </div>
+            <button 
+              @click="showPageNumbers = !showPageNumbers" 
+              class="view-btn"
+              :title="showPageNumbers ? 'Hide page numbers' : 'Show page numbers'"
+            >
+              {{ showPageNumbers ? '🔢' : '#' }}
+            </button>
           </div>
         </div>
       </div>
 
-      <!-- Action Toolbar -->
-      <div class="action-toolbar">
-        <div class="selection-actions">
-          <button @click="selectAllPages" class="toolbar-btn">
-            ☑ Select All
+      <!-- Quick Actions Bar -->
+      <div class="quick-actions">
+        <div class="action-group">
+          <button 
+            @click="selectAllPages" 
+            class="action-btn compact"
+            :disabled="pages.length === 0"
+            title="Select all pages"
+          >
+            ☑ All
           </button>
-          <button @click="clearSelection" class="toolbar-btn" :disabled="selectedPages.size === 0">
-            ☐ Clear Selection
+          <button 
+            @click="selectCurrentPage" 
+            class="action-btn compact"
+            :disabled="pages.length === 0"
+            title="Select current page"
+          >
+            📄 Current
+          </button>
+          <button 
+            @click="clearSelection" 
+            class="action-btn compact"
+            :disabled="selectionStats.selected === 0"
+            title="Clear selection"
+          >
+            ✕ Clear
           </button>
         </div>
-        <div class="page-actions">
+        
+        <div class="action-group">
           <button 
             v-for="action in actions" 
             :key="action.id"
             @click="performAction(action.id)"
-            class="action-btn"
+            class="action-btn icon-only"
             :style="{ '--btn-color': action.color }"
-            :title="action.name"
-            :disabled="selectedPages.size === 0"
+            :title="action.title"
+            :disabled="selectionStats.selected === 0"
           >
-            <span class="action-icon">{{ action.icon }}</span>
-            <span class="action-text">{{ action.name }}</span>
+            {{ action.name }}
           </button>
         </div>
       </div>
 
-      <!-- Pages Display -->
-      <div class="pages-container" :class="[viewMode, pageSize]">
-        <div 
-          v-for="(page, index) in pages" 
-          :key="page.id"
-          class="page-item"
-          :class="{ 
-            selected: page.selected,
-            dragging: dragOverIndex === index,
-            'has-rotation': page.rotation !== 0
-          }"
-          @click="togglePageSelection(page.id, $event)"
-          @contextmenu.prevent="togglePageSelection(page.id, $event)"
-          draggable="true"
-          @dragstart="startDrag(index, $event)"
-          @dragover.prevent="onDragOver(index, $event)"
-          @drop="onDrop(index, $event)"
-          @dragleave="dragOverIndex = null"
-          @dragend="isDragging = false"
-        >
-          <!-- Page number and drag handle -->
-          <div class="page-header">
-            <div class="page-number">
-              <span class="current-number">{{ page.number }}</span>
-              <span v-if="page.rotation !== 0" class="rotation-indicator">
+      <!-- Pages Grid -->
+      <div class="pages-grid-container">
+        <!-- Pagination Header -->
+        <div class="pagination-header">
+          <div class="pagination-info">
+            Showing pages {{ selectionStats.currentRange }} of {{ selectionStats.total }}
+          </div>
+          <div class="pagination-controls">
+            <button @click="prevPage" :disabled="currentPageIndex === 1" class="page-nav">
+              ←
+            </button>
+            <div class="page-numbers">
+              <span 
+                v-for="page in Math.min(5, totalPages)" 
+                :key="page"
+                @click="goToPage(page)"
+                :class="{ active: currentPageIndex === page }"
+                class="page-number"
+              >
+                {{ page }}
+              </span>
+              <span v-if="totalPages > 5" class="page-ellipsis">...</span>
+              <span 
+                v-if="totalPages > 1" 
+                @click="goToPage(totalPages)"
+                :class="{ active: currentPageIndex === totalPages }"
+                class="page-number"
+              >
+                {{ totalPages }}
+              </span>
+            </div>
+            <button @click="nextPage" :disabled="currentPageIndex === totalPages" class="page-nav">
+              →
+            </button>
+          </div>
+        </div>
+
+        <!-- Pages Grid -->
+        <div class="pages-grid">
+          <div 
+            v-for="(page, index) in paginatedPages" 
+            :key="page.id"
+            class="page-card"
+            :class="{ 
+              selected: page.selected,
+              dragging: dragOverIndex === index,
+              rotated: page.rotation !== 0
+            }"
+            @click="togglePageSelection(page.id, $event)"
+            draggable="true"
+            @dragstart="startDrag(index, $event)"
+            @dragover.prevent="onDragOver(index, $event)"
+            @drop="onDrop(index, $event)"
+            @dragleave="dragOverIndex = null"
+            @dragend="isDragging = false"
+          >
+            <!-- Page Number -->
+            <div v-if="showPageNumbers" class="page-number-badge">
+              {{ page.number }}
+              <span v-if="page.rotation !== 0" class="rotation-badge">
                 {{ page.rotation }}°
               </span>
             </div>
-            <div class="page-controls">
-              <button @click.stop="movePageUp(index)" class="move-btn" title="Move up">⬆️</button>
-              <button @click.stop="movePageDown(index)" class="move-btn" title="Move down">⬇️</button>
-              <button @click.stop="moveToTop(index)" class="move-btn" title="Move to top">⏫</button>
-              <button @click.stop="moveToBottom(index)" class="move-btn" title="Move to bottom">⏬</button>
+            
+            <!-- Thumbnail -->
+            <div v-if="showThumbnails" class="page-thumbnail">
+              <div 
+                class="thumbnail"
+                :style="{ 
+                  backgroundImage: `url(${page.thumbnail})`,
+                  transform: `rotate(${page.rotation}deg)`
+                }"
+              ></div>
+              <div class="thumbnail-overlay">
+                <span class="page-label">Page {{ page.number }}</span>
+              </div>
+            </div>
+            
+            <!-- Fallback when thumbnails are hidden -->
+            <div v-else class="page-placeholder">
+              <span class="placeholder-icon">📄</span>
+              <span class="placeholder-text">Page {{ page.number }}</span>
+              <span v-if="page.rotation !== 0" class="placeholder-rotation">
+                ↻ {{ page.rotation }}°
+              </span>
+            </div>
+            
+            <!-- Selection Checkbox -->
+            <div class="selection-indicator">
+              <div class="checkbox" :class="{ checked: page.selected }">
+                <span v-if="page.selected">✓</span>
+              </div>
+            </div>
+            
+            <!-- Quick Actions on Hover -->
+            <div class="page-actions-hover">
+              <button 
+                @click.stop="rotatePages([page.id], 90)" 
+                class="hover-action"
+                title="Rotate right"
+              >
+                ↻
+              </button>
+              <button 
+                @click.stop="deletePages([page.id])" 
+                class="hover-action delete"
+                title="Delete page"
+              >
+                ×
+              </button>
             </div>
           </div>
+        </div>
 
-          <!-- Page thumbnail -->
-          <div v-if="showThumbnails" class="page-thumbnail">
-            <div 
-              class="thumbnail-placeholder"
-              :style="{ 
-                backgroundImage: `url(${page.thumbnail})`,
-                transform: `rotate(${page.rotation}deg)`
-              }"
-            >
-              <div class="page-label">{{ page.label }}</div>
-            </div>
-          </div>
-
-          <!-- Page info (for list view) -->
-          <div v-if="viewMode === 'list'" class="page-info">
-            <h4>{{ page.label }}</h4>
-            <p>{{ page.content }}</p>
-            <div class="page-meta">
-              <span>{{ page.size }}</span>
-              <span>{{ page.dimensions }}</span>
-            </div>
-          </div>
-
-          <!-- Selection checkbox -->
-          <div class="selection-checkbox">
-            <input 
-              type="checkbox" 
-              :checked="page.selected"
-              @click.stop="togglePageSelection(page.id, $event)"
-            />
-          </div>
+        <!-- Empty State -->
+        <div v-if="pages.length === 0" class="empty-state">
+          <div class="empty-icon">📄</div>
+          <p>No pages to display</p>
+          <small>Upload a PDF to start organizing pages</small>
         </div>
       </div>
 
-      <!-- Empty state -->
-      <div v-if="pages.length === 0" class="empty-state">
-        <div class="empty-icon">📄</div>
-        <p>No pages to display</p>
-        <p class="empty-hint">Upload a PDF to start organizing pages</p>
-      </div>
-
-      <!-- Page Stats -->
-      <div class="page-stats">
-        <div class="stat">
-          <span class="stat-label">Total Pages:</span>
-          <span class="stat-value">{{ pages.length }}</span>
-        </div>
-        <div class="stat">
-          <span class="stat-label">Selected:</span>
-          <span class="stat-value">{{ selectedPages.size }}</span>
-        </div>
-        <div class="stat">
-          <span class="stat-label">Rotated:</span>
-          <span class="stat-value">{{ pages.filter(p => p.rotation !== 0).length }}</span>
-        </div>
-      </div>
-
-      <!-- Keyboard Shortcuts Help -->
-      <div class="shortcuts-help">
-        <details>
-          <summary>📋 Keyboard Shortcuts</summary>
-          <div class="shortcuts-list">
-            <div class="shortcut">
-              <kbd>Ctrl/Cmd</kbd> + <kbd>A</kbd>
-              <span>Select all pages</span>
-            </div>
-            <div class="shortcut">
-              <kbd>Shift</kbd> + <kbd>Click</kbd>
-              <span>Select range of pages</span>
-            </div>
-            <div class="shortcut">
-              <kbd>Ctrl/Cmd</kbd> + <kbd>Click</kbd>
-              <span>Multi-select pages</span>
-            </div>
-            <div class="shortcut">
-              <kbd>Delete</kbd>
-              <span>Delete selected pages</span>
-            </div>
-            <div class="shortcut">
-              <kbd>Escape</kbd>
-              <span>Clear selection</span>
-            </div>
+      <!-- Pagination Footer -->
+      <div class="pagination-footer">
+        <div class="footer-left">
+          <div class="page-size-control">
+            <label>Show:</label>
+            <select v-model="itemsPerPage" class="size-select">
+              <option value="8">8 per page</option>
+              <option value="12">12 per page</option>
+              <option value="16">16 per page</option>
+              <option value="20">20 per page</option>
+            </select>
           </div>
-        </details>
+        </div>
+        
+        <div class="footer-right">
+          <div class="keyboard-hint">
+            <kbd>Ctrl+A</kbd> Select all • 
+            <kbd>Shift+Click</kbd> Range • 
+            <kbd>Del</kbd> Delete
+          </div>
+        </div>
       </div>
     </div>
 
@@ -611,592 +655,667 @@ onUnmounted(() => {
         v-if="file" 
         @click="resetOrganization" 
         class="secondary-btn"
+        :disabled="loading"
       >
-        Reset
+        ↺ Reset
       </button>
       <button 
         class="organize-btn" 
         @click="organizePdf" 
         :disabled="loading || !file || pages.length === 0"
+        :class="{ loading: loading }"
       >
-        <span v-if="loading">🔄 Organizing PDF...</span>
-        <span v-else>🚀 Download Organized PDF</span>
+        <template v-if="loading">
+          <span class="spinner">⟳</span>
+          Processing... {{ progress }}%
+        </template>
+        <template v-else>
+          🚀 Download Organized PDF
+        </template>
       </button>
     </div>
 
-    <!-- Status & Progress -->
-    <p v-if="loading" class="status-text">{{ statusText }}</p>
-    <div v-if="loading" class="progress-wrapper">
-      <div class="progress-bar" :style="{ width: progress + '%' }"></div>
+    <!-- Progress Bar -->
+    <div v-if="loading" class="progress-container">
+      <div class="progress-info">
+        <span class="status">{{ statusText }}</span>
+        <span class="percentage">{{ progress }}%</span>
+      </div>
+      <div class="progress-bar">
+        <div 
+          class="progress-fill" 
+          :style="{ width: progress + '%' }"
+        ></div>
+      </div>
     </div>
+
   </div>
 </template>
 
 <style scoped>
 .converter {
-  text-align: center;
   max-width: 1200px;
   margin: 0 auto;
+  padding: 20px;
 }
 
-.converter h2 {
+h2 {
   font-size: 24px;
   margin-bottom: 8px;
   color: #333;
+  text-align: center;
 }
 
 .subtitle {
   font-size: 14px;
   color: #666;
-  margin-bottom: 25px;
+  margin-bottom: 30px;
+  text-align: center;
   line-height: 1.5;
 }
 
 /* File Upload */
 .upload-box {
   display: block;
-  border: 2px dashed #aaa;
-  border-radius: 12px;
-  padding: 30px 20px;
+  border: 3px dashed #d1d5db;
+  border-radius: 16px;
+  padding: 60px 20px;
   cursor: pointer;
-  background: #f9f9f9;
-  transition: all 0.3s ease;
-  margin-bottom: 25px;
+  background: #f9fafb;
+  transition: all 0.3s;
+  margin: 0 auto 30px;
+  max-width: 600px;
+  text-align: center;
 }
 
 .upload-box:hover {
   border-color: #8FBC5D;
   background: #f5f9f0;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(143, 188, 93, 0.1);
 }
 
 .upload-content .icon {
-  font-size: 42px;
+  font-size: 48px;
   display: block;
-  margin-bottom: 12px;
+  margin-bottom: 15px;
+  color: #8FBC5D;
+}
+
+.upload-content p {
+  font-size: 18px;
+  font-weight: 600;
+  color: #374151;
+  margin: 0 0 8px 0;
 }
 
 .upload-content small {
-  display: block;
-  margin-top: 5px;
-  color: #666;
+  font-size: 14px;
+  color: #6b7280;
 }
 
-/* Organization Interface */
-.organization-interface {
-  text-align: left;
-}
-
-/* Header */
-.org-header {
-  background: #f8f9fa;
-  padding: 20px;
-  border-radius: 12px;
-  margin-bottom: 20px;
-  border: 1px solid #e9ecef;
+/* Compact Header */
+.compact-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 20px;
+  background: white;
+  padding: 15px 20px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  margin-bottom: 15px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
-.file-info h3 {
-  font-size: 18px;
-  color: #333;
-  margin: 0 0 5px 0;
-  word-break: break-all;
+.header-left, .header-center, .header-right {
+  display: flex;
+  align-items: center;
+  gap: 15px;
 }
 
-.file-info p {
-  font-size: 13px;
-  color: #666;
-  margin: 0;
+.file-badge {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: #f5f9f0;
+  border-radius: 10px;
+  border: 1px solid #d1e7b5;
 }
 
-.header-controls {
+.file-icon {
+  font-size: 24px;
+  color: #8FBC5D;
+}
+
+.file-details {
   display: flex;
   flex-direction: column;
-  gap: 10px;
 }
 
-.selection-info {
+.file-details strong {
   font-size: 14px;
-  color: #8FBC5D;
-  font-weight: 500;
-  text-align: right;
+  color: #374151;
+  font-weight: 600;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.view-controls {
+.file-details small {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.selection-badge {
   display: flex;
-  gap: 10px;
   align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: #f0f4fa;
+  border-radius: 20px;
+  font-size: 13px;
+  color: #4a6fa5;
+  font-weight: 500;
 }
 
-.view-btn, .size-btn {
-  padding: 8px 12px;
+.selection-badge.rotated {
+  background: #fff8e1;
+  color: #f59e0b;
+}
+
+.selected-count, .rotated-count {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.view-toggle {
+  display: flex;
+  gap: 8px;
+}
+
+.view-btn {
+  width: 36px;
+  height: 36px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
   background: white;
-  border: 1px solid #ddd;
-  border-radius: 6px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: all 0.2s;
 }
 
-.view-btn:hover, .size-btn:hover {
+.view-btn:hover {
   border-color: #8FBC5D;
   background: #f5f9f0;
 }
 
-.size-controls {
-  display: flex;
-  gap: 5px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  padding: 2px;
-  background: white;
-}
-
-.size-btn {
-  padding: 6px 10px;
-  border: none;
-  background: transparent;
-}
-
-.size-btn.active {
-  background: #8FBC5D;
-  color: white;
-}
-
-/* Action Toolbar */
-.action-toolbar {
-  background: white;
-  padding: 15px 20px;
-  border-radius: 12px;
-  margin-bottom: 20px;
-  border: 1px solid #e9ecef;
+/* Quick Actions */
+.quick-actions {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  background: white;
+  padding: 12px 20px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  margin-bottom: 20px;
   flex-wrap: wrap;
   gap: 15px;
 }
 
-.selection-actions, .page-actions {
+.action-group {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
-}
-
-.toolbar-btn {
-  padding: 8px 16px;
-  background: #f8f9fa;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 13px;
-  transition: all 0.2s;
-}
-
-.toolbar-btn:hover:not(:disabled) {
-  background: #e9ecef;
-  border-color: #999;
-}
-
-.toolbar-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .action-btn {
   padding: 8px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
   background: white;
-  border: 1px solid var(--btn-color, #8FBC5D);
-  border-radius: 6px;
   cursor: pointer;
   font-size: 13px;
-  color: var(--btn-color, #8FBC5D);
+  font-weight: 500;
   transition: all 0.2s;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
 }
 
+.action-btn.compact {
+  min-width: 80px;
+}
+
+.action-btn.icon-only {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-color: var(--btn-color, #d1d5db);
+  color: var(--btn-color, #374151);
+}
+
 .action-btn:hover:not(:disabled) {
-  background: var(--btn-color, #8FBC5D);
-  color: white;
+  background: #f5f9f0;
+  border-color: #8FBC5D;
+  transform: translateY(-1px);
 }
 
 .action-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  transform: none !important;
 }
 
-.action-icon {
-  font-size: 16px;
-}
-
-.action-text {
-  font-weight: 500;
-}
-
-/* Pages Container */
-.pages-container {
-  margin: 20px 0;
-  min-height: 400px;
-}
-
-/* Grid View */
-.pages-container.grid {
-  display: grid;
-  gap: 20px;
-}
-
-.pages-container.grid.small {
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-}
-
-.pages-container.grid.medium {
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-}
-
-.pages-container.grid.large {
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-}
-
-/* List View */
-.pages-container.list .page-item {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 20px;
-  align-items: center;
-  padding: 15px;
-  margin-bottom: 10px;
-}
-
-/* Page Item */
-.page-item {
+/* Pages Grid Container */
+.pages-grid-container {
   background: white;
-  border: 2px solid #e9ecef;
-  border-radius: 8px;
-  padding: 15px;
-  position: relative;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  user-select: none;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  margin-bottom: 20px;
+  overflow: hidden;
 }
 
-.page-item:hover {
-  border-color: #8FBC5D;
-  box-shadow: 0 4px 12px rgba(143, 188, 93, 0.1);
-  transform: translateY(-2px);
-}
-
-.page-item.selected {
-  border-color: #8FBC5D;
-  background: #f5f9f0;
-}
-
-.page-item.dragging {
-  border-color: #4a6fa5;
-  background: #f0f4fa;
-}
-
-.page-item.has-rotation {
-  border-left: 4px solid #f39c12;
-}
-
-.page-header {
+/* Pagination Header */
+.pagination-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
-}
-
-.page-number {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.current-number {
-  font-size: 20px;
-  font-weight: bold;
-  color: #333;
+  padding: 15px 20px;
   background: #f8f9fa;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
+  border-bottom: 1px solid #e5e7eb;
 }
 
-.rotation-indicator {
-  font-size: 11px;
-  color: #f39c12;
-  background: #fff8e1;
-  padding: 2px 6px;
-  border-radius: 10px;
+.pagination-info {
+  font-size: 14px;
+  color: #6b7280;
   font-weight: 500;
 }
 
-.page-controls {
+.pagination-controls {
   display: flex;
-  gap: 5px;
-  opacity: 0;
-  transition: opacity 0.2s;
+  align-items: center;
+  gap: 10px;
 }
 
-.page-item:hover .page-controls {
-  opacity: 1;
-}
-
-.move-btn {
-  width: 28px;
-  height: 28px;
+.page-nav {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
   background: white;
-  border: 1px solid #ddd;
-  border-radius: 4px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
 }
 
-.move-btn:hover {
-  background: #f8f9fa;
+.page-nav:hover:not(:disabled) {
   border-color: #8FBC5D;
+  background: #f5f9f0;
 }
 
-/* Page Thumbnail */
-.page-thumbnail {
-  margin: 10px 0;
+.page-nav:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-.thumbnail-placeholder {
-  width: 100%;
-  height: 200px;
-  background: linear-gradient(135deg, #f5f5f5, #e9ecef);
-  border-radius: 6px;
+.page-numbers {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.page-number {
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
-  position: relative;
-  overflow: hidden;
-  transition: transform 0.3s ease;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
-.thumbnail-placeholder::before {
-  content: '';
+.page-number:hover {
+  background: #f3f4f6;
+}
+
+.page-number.active {
+  background: #8FBC5D;
+  color: white;
+}
+
+.page-ellipsis {
+  color: #9ca3af;
+  padding: 0 4px;
+}
+
+/* Pages Grid */
+.pages-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 15px;
+  padding: 20px;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+/* Page Card */
+.page-card {
+  position: relative;
+  background: white;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 15px;
+  cursor: pointer;
+  transition: all 0.3s;
+  aspect-ratio: 3/4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  user-select: none;
+}
+
+.page-card:hover {
+  border-color: #8FBC5D;
+  box-shadow: 0 8px 20px rgba(143, 188, 93, 0.15);
+  transform: translateY(-4px);
+}
+
+.page-card.selected {
+  border-color: #8FBC5D;
+  background: #f5f9f0;
+}
+
+.page-card.dragging {
+  border-color: #4a6fa5;
+  background: #f0f4fa;
+  opacity: 0.8;
+}
+
+.page-card.rotated {
+  border-left: 3px solid #f59e0b;
+}
+
+.page-number-badge {
   position: absolute;
   top: 10px;
   left: 10px;
-  right: 10px;
-  bottom: 10px;
-  border: 1px dashed #ddd;
-  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.rotation-badge {
+  background: #f59e0b;
+  color: white;
+  padding: 1px 4px;
+  border-radius: 8px;
+  font-size: 10px;
+}
+
+.page-thumbnail {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  border-radius: 6px;
+}
+
+.thumbnail {
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  transition: transform 0.3s;
+}
+
+.thumbnail-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+  padding: 8px;
+  text-align: center;
 }
 
 .page-label {
-  position: absolute;
-  bottom: 10px;
-  left: 0;
-  right: 0;
-  text-align: center;
-  font-size: 14px;
+  color: white;
+  font-size: 11px;
   font-weight: 500;
-  color: #666;
-  background: rgba(255, 255, 255, 0.9);
-  padding: 5px;
 }
 
-/* Page Info (List View) */
-.page-info h4 {
-  font-size: 16px;
-  color: #333;
-  margin: 0 0 10px 0;
-}
-
-.page-info p {
-  font-size: 13px;
-  color: #666;
-  margin: 0 0 10px 0;
-  line-height: 1.5;
-}
-
-.page-meta {
+.page-placeholder {
   display: flex;
-  gap: 15px;
-  font-size: 12px;
-  color: #999;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
 }
 
-/* Selection Checkbox */
-.selection-checkbox {
+.placeholder-icon {
+  font-size: 32px;
+  color: #9ca3af;
+}
+
+.placeholder-text {
+  font-size: 13px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.placeholder-rotation {
+  font-size: 11px;
+  color: #f59e0b;
+  background: #fff8e1;
+  padding: 2px 6px;
+  border-radius: 10px;
+}
+
+.selection-indicator {
   position: absolute;
-  top: 15px;
-  left: 15px;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
 }
 
-.selection-checkbox input[type="checkbox"] {
+.checkbox {
   width: 20px;
   height: 20px;
+  border: 2px solid #d1d5db;
+  border-radius: 6px;
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+  transition: all 0.2s;
+}
+
+.checkbox.checked {
+  background: #8FBC5D;
+  border-color: #8FBC5D;
+  color: white;
+}
+
+.page-actions-hover {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: all 0.3s;
+}
+
+.page-card:hover .page-actions-hover {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.hover-action {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(4px);
   cursor: pointer;
-  accent-color: #8FBC5D;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.hover-action:hover {
+  background: #8FBC5D;
+  color: white;
+}
+
+.hover-action.delete:hover {
+  background: #ef4444;
 }
 
 /* Empty State */
 .empty-state {
+  grid-column: 1 / -1;
   text-align: center;
   padding: 60px 20px;
-  background: #f8f9fa;
-  border-radius: 12px;
-  border: 2px dashed #e9ecef;
-  margin: 20px 0;
 }
 
 .empty-icon {
-  font-size: 60px;
+  font-size: 48px;
   margin-bottom: 20px;
   opacity: 0.5;
 }
 
 .empty-state p {
   font-size: 16px;
-  color: #666;
-  margin: 0 0 10px 0;
-}
-
-.empty-hint {
-  font-size: 13px;
-  color: #999;
-}
-
-/* Page Stats */
-.page-stats {
-  display: flex;
-  justify-content: center;
-  gap: 30px;
-  margin: 20px 0;
-  padding: 20px;
-  background: #f8f9fa;
-  border-radius: 12px;
-  border: 1px solid #e9ecef;
-}
-
-.stat {
-  text-align: center;
-}
-
-.stat-label {
-  display: block;
-  font-size: 12px;
-  color: #666;
-  margin-bottom: 5px;
-}
-
-.stat-value {
-  display: block;
-  font-size: 24px;
-  font-weight: bold;
-  color: #8FBC5D;
-}
-
-/* Keyboard Shortcuts Help */
-.shortcuts-help {
-  margin: 20px 0;
-}
-
-.shortcuts-help details {
-  background: #f8f9fa;
-  border-radius: 8px;
-  border: 1px solid #e9ecef;
-  overflow: hidden;
-}
-
-.shortcuts-help summary {
-  padding: 15px 20px;
-  cursor: pointer;
+  color: #6b7280;
+  margin: 0 0 8px 0;
   font-weight: 500;
-  color: #333;
-  list-style: none;
+}
+
+.empty-state small {
+  font-size: 14px;
+  color: #9ca3af;
+}
+
+/* Pagination Footer */
+.pagination-footer {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 10px;
-}
-
-.shortcuts-help summary::-webkit-details-marker {
-  display: none;
-}
-
-.shortcuts-help summary::after {
-  content: '▶';
-  transition: transform 0.3s;
-  margin-left: auto;
-}
-
-.shortcuts-help details[open] summary::after {
-  transform: rotate(90deg);
-}
-
-.shortcuts-list {
   padding: 15px 20px;
-  border-top: 1px solid #e9ecef;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 15px;
+  background: #f8f9fa;
+  border-top: 1px solid #e5e7eb;
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
 }
 
-.shortcut {
+.page-size-control {
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 8px;
 }
 
-.shortcut kbd {
-  background: white;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  padding: 4px 8px;
-  font-size: 12px;
-  font-family: monospace;
-  min-width: 80px;
-  text-align: center;
-}
-
-.shortcut span {
+.page-size-control label {
   font-size: 13px;
-  color: #666;
+  color: #6b7280;
+}
+
+.size-select {
+  padding: 6px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: white;
+  font-size: 13px;
+  color: #374151;
+  cursor: pointer;
+}
+
+.size-select:focus {
+  outline: none;
+  border-color: #8FBC5D;
+}
+
+.keyboard-hint {
+  font-size: 12px;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.keyboard-hint kbd {
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-family: monospace;
 }
 
 /* Action Buttons */
 .action-buttons {
   display: flex;
-  gap: 15px;
+  gap: 20px;
   justify-content: center;
-  margin: 30px 0;
+  margin: 40px 0 30px;
 }
 
 .organize-btn {
   flex: 1;
-  max-width: 300px;
-  padding: 16px 30px;
-  font-size: 16px;
-  border-radius: 10px;
-  border: none;
-  cursor: pointer;
+  max-width: 350px;
+  padding: 18px 30px;
   background: linear-gradient(135deg, #8FBC5D, #7CAF4D);
   color: white;
+  border: none;
+  border-radius: 14px;
+  font-size: 16px;
   font-weight: 600;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 12px rgba(143, 188, 93, 0.2);
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 8px 25px rgba(143, 188, 93, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 56px;
 }
 
 .organize-btn:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(143, 188, 93, 0.3);
+  transform: translateY(-3px);
+  box-shadow: 0 12px 30px rgba(143, 188, 93, 0.4);
   background: linear-gradient(135deg, #7CAF4D, #6BA23D);
 }
 
@@ -1206,43 +1325,212 @@ onUnmounted(() => {
   transform: none !important;
 }
 
+.organize-btn.loading {
+  background: linear-gradient(135deg, #6b7280, #4b5563);
+}
+
 .secondary-btn {
-  padding: 16px 25px;
+  padding: 18px 30px;
   background: white;
-  border: 1px solid #ddd;
-  border-radius: 10px;
-  color: #666;
-  font-weight: 500;
+  border: 2px solid #d1d5db;
+  border-radius: 14px;
+  color: #6b7280;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
+  min-width: 120px;
+  font-size: 15px;
 }
 
-.secondary-btn:hover {
-  background: #f8f9fa;
-  border-color: #999;
+.secondary-btn:hover:not(:disabled) {
+  background: #f9fafb;
+  border-color: #9ca3af;
+  color: #374151;
 }
 
-/* Status & Progress */
-.status-text {
-  margin-top: 15px;
+.secondary-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.spinner {
+  display: inline-block;
+  animation: spin 1s linear infinite;
+  font-size: 18px;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Progress Container */
+.progress-container {
+  margin: 30px auto;
+  max-width: 600px;
+}
+
+.progress-info {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
   font-size: 14px;
-  color: #8FBC5D;
+}
+
+.progress-info .status {
+  color: #374151;
   font-weight: 500;
 }
 
-.progress-wrapper {
-  margin: 15px auto 25px;
-  height: 10px;
-  width: 100%;
-  max-width: 400px;
-  background: #e9ecef;
-  border-radius: 8px;
-  overflow: hidden;
+.progress-info .percentage {
+  color: #8FBC5D;
+  font-weight: 600;
 }
 
 .progress-bar {
+  height: 10px;
+  background: #e5e7eb;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.progress-fill {
   height: 100%;
   background: linear-gradient(90deg, #8FBC5D, #A3D47A);
+  border-radius: 5px;
   transition: width 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  100% { left: 100%; }
+}
+
+/* Quick Tips */
+.quick-tips {
+  background: linear-gradient(135deg, #f0f9f4, #e8f5e9);
+  border: 1px solid #c8e6c9;
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 20px;
+}
+
+.quick-tips h4 {
+  margin: 0 0 12px 0;
+  color: #217346;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.quick-tips ul {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+}
+
+.quick-tips li {
+  margin-bottom: 8px;
+  color: #2e7d32;
+  font-size: 13px;
+  line-height: 1.5;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.quick-tips li:last-child {
+  margin-bottom: 0;
+}
+
+.quick-tips kbd {
+  background: white;
+  border: 1px solid #a3d47a;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-family: monospace;
+  color: #217346;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .converter {
+    padding: 15px;
+  }
+  
+  .pages-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 12px;
+    padding: 15px;
+  }
+  
+  .compact-header {
+    flex-direction: column;
+    gap: 15px;
+    align-items: stretch;
+  }
+  
+  .header-left, .header-center, .header-right {
+    justify-content: center;
+  }
+  
+  .quick-actions {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .action-group {
+    justify-content: center;
+  }
+  
+  .pagination-header, .pagination-footer {
+    flex-direction: column;
+    gap: 15px;
+    text-align: center;
+  }
+  
+  .action-buttons {
+    flex-direction: column;
+  }
+  
+  .organize-btn, .secondary-btn {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .pages-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 10px;
+    padding: 10px;
+  }
+  
+  .page-card {
+    padding: 10px;
+  }
+  
+  .file-badge {
+    max-width: 100%;
+    overflow: hidden;
+  }
+  
+  .keyboard-hint {
+    font-size: 11px;
+  }
 }
 </style>

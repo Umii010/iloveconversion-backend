@@ -5,6 +5,8 @@ const file = ref(null)
 const loading = ref(false)
 const progress = ref(0)
 const statusText = ref('')
+const processingTime = ref('')
+const fileSize = ref('')
 
 // Conversion settings
 const conversionSettings = ref({
@@ -26,54 +28,18 @@ const tableDetection = ref({
   ignoreEmptyCells: true
 })
 
-// Sample extracted data for preview
-const sampleData = ref([
-  ['Invoice No.', 'Date', 'Customer', 'Amount', 'Status'],
-  ['INV-2024-001', '2024-01-15', 'Acme Corporation', '$1,250.00', 'Paid'],
-  ['INV-2024-002', '2024-01-16', 'Tech Solutions Inc.', '$3,450.00', 'Pending'],
-  ['INV-2024-003', '2024-01-17', 'Global Industries', '$890.00', 'Paid'],
-  ['INV-2024-004', '2024-01-18', 'Innovation Labs', '$2,150.00', 'Overdue'],
-  ['INV-2024-005', '2024-01-19', 'Digital Creations', '$1,780.00', 'Paid'],
-  ['TOTAL', '', '', '$9,520.00', '']
-])
-
-// Output formats
-const outputFormats = ref([
-  { id: 'xlsx', name: 'Excel (.xlsx)', icon: '📊', desc: 'Modern Excel format with multiple sheets' },
-  { id: 'xls', name: 'Excel 97-2003 (.xls)', icon: '📊', desc: 'Compatible with older Excel versions' },
-  { id: 'csv', name: 'CSV (.csv)', icon: '📄', desc: 'Simple comma-separated values' },
-  { id: 'ods', name: 'OpenDocument (.ods)', icon: '📄', desc: 'OpenOffice/LibreOffice format' }
-])
-
-// Extraction modes
-const extractionModes = ref([
-  { id: 'automatic', name: 'Automatic Detection', icon: '🤖', desc: 'Automatically detect tables and data' },
-  { id: 'tables', name: 'Tables Only', icon: '📊', desc: 'Extract only table structures' },
-  { id: 'text', name: 'All Text', icon: '📝', desc: 'Extract all text content' },
-  { id: 'all', name: 'Everything', icon: '🔍', desc: 'Extract tables, text, and metadata' }
-])
-
-// Data type detection options
-const dataTypeOptions = ref([
-  { id: 'automatic', name: 'Automatic Detection', desc: 'Detect data types automatically' },
-  { id: 'text', name: 'Treat as Text', desc: 'Keep all data as text format' },
-  { id: 'numbers', name: 'Detect Numbers', desc: 'Convert numbers to numeric format' },
-  { id: 'dates', name: 'Detect Dates', desc: 'Convert date strings to date format' }
-])
-
-// Supported PDF types
-const supportedPdfTypes = ref([
-  { type: 'scanned', name: 'Scanned PDFs', icon: '📷', supported: 'Limited' },
-  { type: 'digital', name: 'Digital PDFs', icon: '💻', supported: 'Full' },
-  { type: 'forms', name: 'PDF Forms', icon: '📋', supported: 'Good' },
-  { type: 'reports', name: 'Reports', icon: '📈', supported: 'Excellent' }
-])
+// Estimate processing time based on file size
+const estimateTime = (sizeMB) => {
+  if (sizeMB < 2) return '5-10 seconds'
+  if (sizeMB < 10) return '10-30 seconds'
+  if (sizeMB < 50) return '30-60 seconds'
+  return '1-2 minutes'
+}
 
 const selectFile = (e) => {
   const selectedFile = e.target.files[0]
   if (!selectedFile) return
   
-  // Check if it's a PDF
   if (!selectedFile.name.toLowerCase().endsWith('.pdf')) {
     alert('Please select a PDF file')
     e.target.value = ''
@@ -81,14 +47,8 @@ const selectFile = (e) => {
   }
   
   file.value = selectedFile
+  fileSize.value = (selectedFile.size / (1024 * 1024)).toFixed(1) + ' MB'
   console.log('PDF file selected for Excel conversion:', selectedFile.name)
-  
-  // Reset preview data
-  sampleData.value = [
-    ['File selected:', selectedFile.name, '', '', ''],
-    ['Size:', (selectedFile.size / 1024 / 1024).toFixed(2) + ' MB', '', '', ''],
-    ['Ready for conversion', '', '', '', '']
-  ]
 }
 
 const convertPdfToExcel = async () => {
@@ -100,24 +60,55 @@ const convertPdfToExcel = async () => {
   loading.value = true
   progress.value = 0
   statusText.value = 'Starting PDF analysis...'
+  processingTime.value = ''
+  
+  const startTime = Date.now()
 
   const formData = new FormData()
-  formData.append('pdf', file.value)
+  formData.append('file', file.value)
   formData.append('settings', JSON.stringify({
     conversion: conversionSettings.value,
     tables: tableDetection.value
   }))
 
   let fakeProgress = null
+  let progressInterval = null
 
   try {
-    // Fake progress for better UX
-    fakeProgress = setInterval(() => {
-      if (progress.value < 90) {
-        progress.value += Math.random() * 8
-        updateStatusText(progress.value)
+    // More realistic progress simulation based on typical conversion stages
+    const stages = [
+      { min: 0, max: 15, duration: 2000 },  // Upload & analysis
+      { min: 15, max: 40, duration: 3000 }, // Table detection
+      { min: 40, max: 70, duration: 4000 }, // Data extraction
+      { min: 70, max: 90, duration: 3000 }  // Excel creation
+    ]
+    
+    let currentStage = 0
+    let stageStartTime = Date.now()
+    
+    progressInterval = setInterval(() => {
+      const now = Date.now()
+      const stageElapsed = now - stageStartTime
+      const stageDuration = stages[currentStage].duration
+      
+      // Calculate progress within current stage
+      const stageProgress = Math.min(1, stageElapsed / stageDuration)
+      const stageRange = stages[currentStage].max - stages[currentStage].min
+      const newProgress = stages[currentStage].min + (stageProgress * stageRange)
+      
+      if (newProgress > progress.value) {
+        progress.value = Math.min(90, newProgress)
       }
-    }, 500)
+      
+      // Move to next stage if current one is complete
+      if (stageProgress >= 1 && currentStage < stages.length - 1) {
+        currentStage++
+        stageStartTime = now
+      }
+      
+      updateStatusText(progress.value)
+      
+    }, 200)
 
     // Call conversion API
     const res = await fetch('http://192.168.18.101:3000/api/pdf-to-excel', {
@@ -125,15 +116,21 @@ const convertPdfToExcel = async () => {
       body: formData
     })
 
+    clearInterval(progressInterval)
+    progress.value = 95
+    statusText.value = 'Finalizing Excel file...'
+
     if (!res.ok) {
       const errorText = await res.text()
       throw new Error(`Server error: ${res.status} - ${errorText}`)
     }
 
-    clearInterval(fakeProgress)
-    progress.value = 100
-    statusText.value = 'Downloading Excel file...'
-
+    // Get processing time from headers
+    const procTime = res.headers.get('X-Processing-Time') || '0s'
+    const fSize = res.headers.get('X-File-Size') || 'Unknown'
+    
+    processingTime.value = `Processed in ${procTime}`
+    
     // Get filename
     const contentDisposition = res.headers.get('content-disposition')
     let fileName = `${file.value.name.replace('.pdf', '')}.${conversionSettings.value.format}`
@@ -144,6 +141,10 @@ const convertPdfToExcel = async () => {
         fileName = matches[1]
       }
     }
+
+    // Calculate total time
+    const totalTime = ((Date.now() - startTime) / 1000).toFixed(1)
+    console.log(`Total conversion time: ${totalTime}s`)
 
     // Download the Excel file
     const blob = await res.blob()
@@ -157,240 +158,164 @@ const convertPdfToExcel = async () => {
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
 
-    statusText.value = 'Conversion completed!'
+    progress.value = 100
+    statusText.value = `✅ Conversion complete! Downloading...`
+
+    // Show success message with stats
+    setTimeout(() => {
+      statusText.value = `✅ Complete! File: ${fileName}`
+    }, 1000)
 
   } catch (err) {
-    statusText.value = 'Conversion failed'
-    alert('Conversion failed: ' + err.message)
+    statusText.value = '❌ Conversion failed'
     console.error('PDF to Excel error:', err)
+    
+    let userMessage = 'Conversion failed: '
+    if (err.message.includes('No tables detected')) {
+      userMessage += 'The PDF does not contain extractable tables.'
+    } else if (err.message.includes('timeout')) {
+      userMessage += 'Conversion took too long. Try a smaller PDF.'
+    } else {
+      userMessage += err.message
+    }
+    
+    alert(userMessage)
+    
   } finally {
-    if (fakeProgress) clearInterval(fakeProgress)
-    loading.value = false
+    if (progressInterval) clearInterval(progressInterval)
+    
+    // Reset after delay
     setTimeout(() => {
+      loading.value = false
       progress.value = 0
       statusText.value = ''
-    }, 2000)
+    }, 3000)
   }
 }
 
 const updateStatusText = (progressValue) => {
-  if (progressValue < 15) {
-    statusText.value = 'Analyzing PDF structure...'
-  } else if (progressValue < 30) {
-    statusText.value = 'Detecting tables and data...'
-  } else if (progressValue < 50) {
-    statusText.value = 'Extracting text content...'
-  } else if (progressValue < 70) {
-    statusText.value = 'Processing table data...'
-  } else if (progressValue < 85) {
-    statusText.value = 'Formatting Excel sheet...'
+  if (progressValue < 10) {
+    statusText.value = '📤 Uploading PDF to server...'
+  } else if (progressValue < 25) {
+    statusText.value = '🔍 Analyzing PDF structure...'
+  } else if (progressValue < 40) {
+    statusText.value = '📋 Detecting tables and data...'
+  } else if (progressValue < 60) {
+    statusText.value = '📝 Extracting text content...'
+  } else if (progressValue < 80) {
+    statusText.value = '💾 Processing table data...'
+  } else if (progressValue < 95) {
+    statusText.value = '📊 Formatting Excel spreadsheet...'
   } else {
-    statusText.value = 'Finalizing spreadsheet...'
+    statusText.value = '🎯 Finalizing and downloading...'
   }
 }
 
 const clearFile = () => {
   file.value = null
+  fileSize.value = ''
+  processingTime.value = ''
   const input = document.querySelector('input[type="file"]')
   if (input) input.value = ''
-  
-  // Reset sample data
-  sampleData.value = [
-    ['No file selected', '', '', '', ''],
-    ['Upload a PDF to see preview', '', '', '', ''],
-    ['Supported: Tables, lists, forms', '', '', '', '']
-  ]
 }
-
-// Generate sample preview data
-const generateSamplePreview = () => {
-  sampleData.value = [
-    ['ID', 'Product', 'Category', 'Price', 'Stock', 'Last Updated'],
-    ['P-001', 'Laptop Pro', 'Electronics', '$1,299.99', '45', '2024-01-15'],
-    ['P-002', 'Wireless Mouse', 'Accessories', '$29.99', '120', '2024-01-14'],
-    ['P-003', 'USB-C Cable', 'Accessories', '$19.99', '200', '2024-01-16'],
-    ['P-004', 'Monitor 27"', 'Electronics', '$349.99', '25', '2024-01-13'],
-    ['P-005', 'Keyboard', 'Accessories', '$79.99', '85', '2024-01-12'],
-    ['P-006', 'Webcam HD', 'Electronics', '$89.99', '60', '2024-01-15'],
-    ['TOTAL', '', '', '$1,869.94', '', '']
-  ]
-}
-
-// Preview columns for sample data
-const previewColumns = computed(() => {
-  if (sampleData.value.length === 0) return []
-  return sampleData.value[0].map((_, index) => `Column ${index + 1}`)
-})
 </script>
 
 <template>
   <div class="converter">
     <h2>PDF to Excel Converter</h2>
-    <p class="subtitle">Extract tables, data, and content from PDFs to editable Excel spreadsheets</p>
+    <p class="subtitle">Extract tables and data from PDFs to editable Excel spreadsheets</p>
 
     <!-- File Upload -->
     <label class="upload-box">
       <input
-        type="file"
+        type="file" name="file"
         accept=".pdf"
         @change="selectFile"
         hidden
       />
       <div class="upload-content">
-        <span class="icon">📊</span>
+        <span class="icon">📄 → 📊</span>
         <p><strong>Click to upload</strong> a PDF file</p>
-        <small class="file-info">{{ file ? file.name : 'No file selected' }}</small>
-        <small>Extract tables, lists, and data to Excel</small>
+        <div class="file-details">
+          <small class="file-info">{{ file ? file.name : 'No file selected' }}</small>
+          <small v-if="fileSize" class="file-size">Size: {{ fileSize }}</small>
+          <small v-if="file && !processingTime" class="time-estimate">
+            ⏱️ Estimated: {{ estimateTime(parseFloat(fileSize)) }}
+          </small>
+        </div>
+        <small>Extract tables, lists, and structured data</small>
       </div>
     </label>
 
-
-    <!-- Conversion Settings -->
-    <div v-if="file" class="conversion-settings">
-      <h3>Conversion Settings</h3>
-      
-      <!-- Output Format -->
-      <div class="setting-group">
-        <h4><span class="setting-icon">📤</span> Output Format</h4>
-        <div class="format-options">
-          <label 
-            v-for="format in outputFormats" 
-            :key="format.id"
-            :class="['format-option', { selected: conversionSettings.format === format.id }]"
-          >
-            <input 
-              type="radio" 
-              v-model="conversionSettings.format" 
-              :value="format.id" 
-              hidden
-            />
-            <div class="format-content">
-              <span class="option-icon">{{ format.icon }}</span>
-              <div class="option-info">
-                <span class="option-name">{{ format.name }}</span>
-                <span class="option-desc">{{ format.desc }}</span>
-              </div>
-            </div>
-          </label>
-        </div>
-      </div>
-
-      <!-- Extraction Mode -->
-      <div class="setting-group">
-        <h4><span class="setting-icon">🔍</span> Extraction Mode</h4>
-        <div class="mode-options">
-          <label 
-            v-for="mode in extractionModes" 
-            :key="mode.id"
-            :class="['mode-option', { selected: conversionSettings.extractionMode === mode.id }]"
-          >
-            <input 
-              type="radio" 
-              v-model="conversionSettings.extractionMode" 
-              :value="mode.id" 
-              hidden
-            />
-            <div class="mode-content">
-              <span class="mode-icon">{{ mode.icon }}</span>
-              <div class="mode-info">
-                <span class="mode-name">{{ mode.name }}</span>
-                <span class="mode-desc">{{ mode.desc }}</span>
-              </div>
-            </div>
-          </label>
-        </div>
-      </div>
-
-      <!-- Table Detection Settings -->
-      <div class="setting-group" v-if="conversionSettings.extractionMode !== 'text'">
-        <h4><span class="setting-icon">📊</span> Table Detection</h4>
-        <div class="table-settings">
-          <div class="table-grid">
-            <label class="table-option">
-              <input type="checkbox" v-model="tableDetection.detectTables" />
-              <span class="table-text">Detect Tables</span>
-              <span class="table-hint">Automatically find table structures</span>
-            </label>
-            <label class="table-option">
-              <input type="checkbox" v-model="tableDetection.detectBorders" />
-              <span class="table-text">Detect Borders</span>
-              <span class="table-hint">Use border lines to identify tables</span>
-            </label>
-            <label class="table-option">
-              <input type="checkbox" v-model="tableDetection.mergeCells" />
-              <span class="table-text">Merge Cells</span>
-              <span class="table-hint">Merge cells for better formatting</span>
-            </label>
-            <label class="table-option">
-              <input type="checkbox" v-model="tableDetection.detectMergedCells" />
-              <span class="table-text">Detect Merged Cells</span>
-              <span class="table-hint">Identify merged cells in tables</span>
-            </label>
-          </div>
-        </div>
-      </div>
-
-      <!-- Data Processing -->
-      <div class="setting-group">
-        <h4><span class="setting-icon">⚙️</span> Data Processing</h4>
-        <div class="data-settings">
-          <div class="data-grid">
-            <label class="data-option">
-              <input type="checkbox" v-model="conversionSettings.includeHeaders" />
-              <span class="data-text">Include Headers</span>
-              <span class="data-hint">Include table headers in output</span>
-            </label>
-            <label class="data-option">
-              <input type="checkbox" v-model="conversionSettings.preserveFormatting" />
-              <span class="data-text">Preserve Formatting</span>
-              <span class="data-hint">Keep original formatting where possible</span>
-            </label>
-            <label class="data-option">
-              <input type="checkbox" v-model="conversionSettings.multipleSheets" />
-              <span class="data-text">Multiple Sheets</span>
-              <span class="data-hint">Create separate sheets for different tables</span>
-            </label>
-            <label class="data-option">
-              <input type="checkbox" v-model="conversionSettings.extractImages" />
-              <span class="data-text">Extract Images</span>
-              <span class="data-hint">Include images in Excel (if any)</span>
-            </label>
-          </div>
-        </div>
-      </div>
-
-      <!-- Data Type Detection -->
-      <div class="setting-group">
-        <h4><span class="setting-icon">🔢</span> Data Type Detection</h4>
-        <div class="data-type-options">
-          <select v-model="conversionSettings.dataTypeDetection" class="data-type-select">
-            <option v-for="option in dataTypeOptions" :key="option.id" :value="option.id">
-              {{ option.name }} - {{ option.desc }}
-            </option>
-          </select>
-        </div>
-      </div>
-    </div>
-
     <!-- Action Buttons -->
     <div class="action-buttons">
-      <button v-if="file" @click="clearFile" class="secondary-btn">
-        Clear File
+      <button v-if="file" @click="clearFile" class="secondary-btn" :disabled="loading">
+        ✕ Clear File
       </button>
       <button 
         class="convert-btn" 
         @click="convertPdfToExcel" 
         :disabled="loading || !file"
+        :class="{ loading: loading }"
       >
-        <span v-if="loading">🔄 Converting PDF to Excel...</span>
-        <span v-else>🚀 Convert to Excel</span>
+        <template v-if="loading">
+          <span class="spinner">⟳</span>
+          Converting... {{ progress.toFixed(0) }}%
+        </template>
+        <template v-else>
+          🚀 Convert to Excel
+        </template>
       </button>
     </div>
 
-    <!-- Status & Progress -->
-    <p v-if="loading" class="status-text">{{ statusText }}</p>
-    <div v-if="loading" class="progress-wrapper">
-      <div class="progress-bar" :style="{ width: progress + '%' }"></div>
+    <!-- Progress Section -->
+    <div v-if="loading" class="progress-section">
+      <div class="progress-header">
+        <span class="status">{{ statusText }}</span>
+        <span class="percentage">{{ progress.toFixed(0) }}%</span>
+      </div>
+      
+      <div class="progress-container">
+        <div class="progress-bar">
+          <div 
+            class="progress-fill" 
+            :style="{ width: progress + '%' }"
+          >
+            <span class="progress-text">{{ progress.toFixed(0) }}%</span>
+          </div>
+        </div>
+        
+        <div class="progress-labels">
+          <span>Upload</span>
+          <span>Analyze</span>
+          <span>Extract</span>
+          <span>Format</span>
+          <span>Complete</span>
+        </div>
+      </div>
+      
+      <div class="progress-stages">
+        <div class="stage" :class="{ active: progress >= 10 }">
+          <div class="stage-dot"></div>
+          <span class="stage-label">Upload</span>
+        </div>
+        <div class="stage" :class="{ active: progress >= 30 }">
+          <div class="stage-dot"></div>
+          <span class="stage-label">Analyze</span>
+        </div>
+        <div class="stage" :class="{ active: progress >= 50 }">
+          <div class="stage-dot"></div>
+          <span class="stage-label">Extract</span>
+        </div>
+        <div class="stage" :class="{ active: progress >= 75 }">
+          <div class="stage-dot"></div>
+          <span class="stage-label">Format</span>
+        </div>
+        <div class="stage" :class="{ active: progress >= 95 }">
+          <div class="stage-dot"></div>
+          <span class="stage-label">Download</span>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -399,29 +324,33 @@ const previewColumns = computed(() => {
 <style scoped>
 .converter {
   text-align: center;
-  max-width: 1200px;
+  max-width: 800px;
   margin: 0 auto;
+  padding: 30px 20px;
 }
 
-.converter h2 {
-  font-size: 24px;
-  margin-bottom: 8px;
+h2 {
+  font-size: 28px;
+  margin-bottom: 10px;
   color: #333;
+  background: linear-gradient(135deg, #217346, #2e8b57);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .subtitle {
-  font-size: 14px;
+  font-size: 16px;
   color: #666;
-  margin-bottom: 25px;
+  margin-bottom: 30px;
   line-height: 1.5;
 }
 
 /* File Upload */
 .upload-box {
   display: block;
-  border: 2px dashed #aaa;
-  border-radius: 12px;
-  padding: 30px 20px;
+  border: 3px dashed #aaa;
+  border-radius: 16px;
+  padding: 40px 20px;
   cursor: pointer;
   background: #f9f9f9;
   transition: all 0.3s ease;
@@ -431,358 +360,385 @@ const previewColumns = computed(() => {
 .upload-box:hover {
   border-color: #217346;
   background: #f0f9f4;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(33, 115, 70, 0.1);
 }
 
 .upload-content .icon {
-  font-size: 42px;
+  font-size: 48px;
   display: block;
-  margin-bottom: 12px;
+  margin-bottom: 15px;
+}
+
+.file-details {
+  margin: 15px 0;
 }
 
 .file-info {
   display: block;
-  margin: 10px 0 5px;
-  font-weight: 500;
+  font-weight: 600;
   color: #217346 !important;
+  font-size: 15px;
+  margin-bottom: 5px;
 }
 
-/* Supported PDF Types */
-.supported-types {
-  background: #f8f9fa;
+.file-size, .time-estimate {
+  display: block;
+  font-size: 13px;
+  color: #666;
+  margin: 3px 0;
+}
+
+/* File Info Card */
+.file-info-card {
+  background: white;
+  border-radius: 12px;
   padding: 20px;
-  border-radius: 12px;
-  margin-bottom: 25px;
+  margin: 20px 0;
   border: 1px solid #e9ecef;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
-.supported-types h4 {
-  font-size: 16px;
-  color: #333;
-  margin: 0 0 20px 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  justify-content: center;
-}
-
-.types-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 15px;
-}
-
-.type-item {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  padding: 15px;
-  background: white;
-  border-radius: 8px;
-  border: 1px solid #e9ecef;
-}
-
-.type-icon {
-  font-size: 24px;
-  width: 50px;
-  height: 50px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #f0f9f4;
-  border-radius: 10px;
-}
-
-.type-info {
-  text-align: left;
-  flex: 1;
-}
-
-.type-name {
-  display: block;
-  font-size: 14px;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 4px;
-}
-
-.type-support {
-  display: block;
-  font-size: 12px;
-  color: #666;
-  background: #f8f9fa;
-  padding: 3px 8px;
-  border-radius: 12px;
-  display: inline-block;
-}
-
-/* Conversion Settings */
-.conversion-settings {
-  background: #f8f9fa;
-  padding: 25px;
-  border-radius: 12px;
-  margin-bottom: 25px;
-  border: 1px solid #e9ecef;
-  text-align: left;
-}
-
-.conversion-settings h3 {
-  font-size: 18px;
-  color: #333;
-  margin: 0 0 20px 0;
-  text-align: center;
-}
-
-.setting-group {
-  margin-bottom: 30px;
-}
-
-.setting-group h4 {
-  font-size: 16px;
-  color: #333;
-  margin: 0 0 15px 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.setting-icon {
-  font-size: 20px;
-}
-
-/* Format Options */
-.format-options, .mode-options {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 12px;
-}
-
-.format-option, .mode-option {
-  background: white;
-  border: 2px solid #e9ecef;
-  border-radius: 8px;
-  padding: 15px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.format-option:hover, .mode-option:hover {
-  border-color: #217346;
-}
-
-.format-option.selected, .mode-option.selected {
-  border-color: #217346;
-  background: #f0f9f4;
-}
-
-.format-content, .mode-content {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.option-icon, .mode-icon {
-  font-size: 24px;
-  width: 50px;
-  height: 50px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #f8f9fa;
-  border-radius: 8px;
-  flex-shrink: 0;
-}
-
-.option-info, .mode-info {
-  flex: 1;
-  text-align: left;
-}
-
-.option-name, .mode-name {
-  display: block;
-  font-size: 14px;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 4px;
-}
-
-.option-desc, .mode-desc {
-  display: block;
-  font-size: 12px;
-  color: #666;
-  line-height: 1.4;
-}
-
-/* Table Settings */
-.table-settings, .data-settings {
-  background: white;
-  padding: 20px;
-  border-radius: 8px;
-  border: 1px solid #e9ecef;
-}
-
-.table-grid, .data-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 15px;
-}
-
-.table-option, .data-option {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  cursor: pointer;
-}
-
-.table-text, .data-text {
-  font-size: 14px;
-  font-weight: 500;
-  color: #333;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.table-text::before, .data-text::before {
-  content: '';
-  width: 18px;
-  height: 18px;
-  border: 2px solid #ddd;
-  border-radius: 4px;
-  display: inline-block;
-  vertical-align: middle;
-}
-
-.table-option input[type="checkbox"]:checked + .table-text::before,
-.data-option input[type="checkbox"]:checked + .data-text::before {
-  background: #217346;
-  border-color: #217346;
-  content: '✓';
-  color: white;
-  font-size: 12px;
-  text-align: center;
-  line-height: 14px;
-}
-
-.table-hint, .data-hint {
-  font-size: 12px;
-  color: #666;
-  margin-left: 26px;
-  line-height: 1.4;
-}
-
-.table-option input[type="checkbox"],
-.data-option input[type="checkbox"] {
-  display: none;
-}
-
-/* Data Type Options */
-.data-type-options {
-  background: white;
-  padding: 15px;
-  border-radius: 8px;
-  border: 1px solid #e9ecef;
-}
-
-.data-type-select {
-  width: 100%;
-  padding: 12px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 14px;
-  background: white;
-  cursor: pointer;
-}
-
-.data-type-select:focus {
-  outline: none;
-  border-color: #217346;
-}
-
-/* Data Preview */
-.data-preview {
-  background: white;
-  border: 1px solid #e9ecef;
-  border-radius: 12px;
-  padding: 25px;
-  margin-bottom: 25px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-
-.preview-header {
+.info-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  padding: 10px 0;
+  border-bottom: 1px solid #f3f4f6;
 }
 
-.preview-header h3 {
-  font-size: 18px;
+.info-row:last-child {
+  border-bottom: none;
+}
+
+.info-label {
+  font-weight: 500;
+  color: #666;
+  font-size: 14px;
+}
+
+.info-value {
+  font-weight: 600;
   color: #333;
-  margin: 0;
+  font-size: 14px;
 }
 
-.preview-btn {
-  padding: 8px 16px;
-  background: #f8f9fa;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 13px;
-  transition: all 0.2s;
+/* Action Buttons */
+.action-buttons {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  margin: 40px 0;
 }
 
-.preview-btn:hover:not(:disabled) {
-  background: #217346;
+.convert-btn {
+  flex: 1;
+  max-width: 350px;
+  padding: 20px 30px;
+  background: linear-gradient(135deg, #217346, #2e8b57);
   color: white;
-  border-color: #217346;
+  border: none;
+  border-radius: 14px;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 8px 25px rgba(33, 115, 70, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 60px;
 }
 
-.preview-btn:disabled {
-  opacity: 0.5;
+.convert-btn:hover:not(:disabled) {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 30px rgba(33, 115, 70, 0.4);
+  background: linear-gradient(135deg, #2e8b57, #217346);
+}
+
+.convert-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+.convert-btn.loading {
+  background: linear-gradient(135deg, #6b7280, #4b5563);
+}
+
+.secondary-btn {
+  padding: 20px 30px;
+  background: white;
+  border: 2px solid #d1d5db;
+  border-radius: 14px;
+  color: #6b7280;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 140px;
+  font-size: 16px;
+}
+
+.secondary-btn:hover:not(:disabled) {
+  background: #f9fafb;
+  border-color: #9ca3af;
+  color: #374151;
+}
+
+.secondary-btn:disabled {
+  opacity: 0.6;
   cursor: not-allowed;
 }
 
-.preview-table {
-  background: #f8f9fa;
-  border-radius: 8px;
+.spinner {
+  display: inline-block;
+  animation: spin 1s linear infinite;
+  font-size: 20px;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Progress Section */
+.progress-section {
+  margin: 40px 0;
+  padding: 30px;
+  background: white;
+  border-radius: 16px;
+  border: 1px solid #e9ecef;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+}
+
+.progress-header .status {
+  font-weight: 600;
+  color: #374151;
+  font-size: 17px;
+}
+
+.progress-header .percentage {
+  font-weight: 700;
+  color: #217346;
+  font-size: 18px;
+  background: #f0f9f4;
+  padding: 6px 15px;
+  border-radius: 20px;
+}
+
+.progress-container {
+  margin-bottom: 30px;
+}
+
+.progress-bar {
+  height: 14px;
+  background: #f3f4f6;
+  border-radius: 7px;
+  overflow: hidden;
+  margin-bottom: 10px;
+  position: relative;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #217346, #2e8b57, #34d399);
+  border-radius: 7px;
+  transition: width 0.5s ease;
+  position: relative;
   overflow: hidden;
 }
 
-.table-container {
-  overflow-x: auto;
-  max-height: 300px;
-  border: 1px solid #e9ecef;
-}
-
-.table-wrapper {
-  min-width: 600px;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: white;
-}
-
-th {
-  background: #217346;
-  color: white;
-  padding: 12px 15px;
-  text-align: left;
-  font-weight: 600;
-  font-size: 13px;
-  position: sticky;
+.progress-fill::after {
+  content: '';
+  position: absolute;
   top: 0;
-  z-index: 10;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  animation: shimmer 2s infinite;
 }
 
-td {
-  padding: 10px 15px;
-  border-bottom: 1px solid #e9ecef;
+.progress-text {
+  position: absolute;
+  right: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.progress-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #9ca3af;
+  padding: 0 5px;
+  margin-top: 5px;
+}
+
+.progress-stages {
+  display: flex;
+  justify-content: space-between;
+  position: relative;
+  margin-top: 40px;
+}
+
+.progress-stages::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: #f3f4f6;
+  z-index: 1;
+}
+
+.stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  z-index: 2;
+}
+
+.stage-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #f3f4f6;
+  border: 3px solid #f3f4f6;
+  margin-bottom: 8px;
+  transition: all 0.3s;
+}
+
+.stage.active .stage-dot {
+  background: white;
+  border-color: #217346;
+  box-shadow: 0 0 0 3px rgba(33, 115, 70, 0.2);
+}
+
+.stage-label {
   font-size: 13px;
-  color: #333;
+  color: #9ca3af;
+  font-weight: 500;
+  text-align: center;
 }
 
-tr:nth-child(even) {
-  background: #f8f9fa;}
-  </style>
+.stage.active .stage-label {
+  color: #374151;
+  font-weight: 600;
+}
+
+@keyframes shimmer {
+  100% { left: 100%; }
+}
+
+/* Tips Box */
+.tips-box {
+  background: linear-gradient(135deg, #f0f9f4, #e8f5e9);
+  border: 1px solid #c8e6c9;
+  border-radius: 16px;
+  padding: 25px;
+  margin-top: 30px;
+}
+
+.tips-box h4 {
+  margin: 0 0 15px 0;
+  color: #217346;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+}
+
+.tips-box ul {
+  margin: 0;
+  padding-left: 20px;
+  list-style: none;
+}
+
+.tips-box li {
+  margin-bottom: 10px;
+  color: #2e7d32;
+  font-size: 14px;
+  line-height: 1.5;
+  position: relative;
+  padding-left: 25px;
+}
+
+.tips-box li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  color: #217346;
+  font-weight: bold;
+}
+
+.tips-box li:last-child {
+  margin-bottom: 0;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .converter {
+    padding: 20px 15px;
+  }
+  
+  .upload-box {
+    padding: 30px 20px;
+  }
+  
+  .action-buttons {
+    flex-direction: column;
+  }
+  
+  .convert-btn,
+  .secondary-btn {
+    width: 100%;
+    max-width: none;
+  }
+  
+  .progress-section {
+    padding: 20px;
+  }
+  
+  .progress-stages {
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: space-around;
+  }
+  
+  .stage {
+    min-width: 80px;
+  }
+}
+
+@media (max-width: 480px) {
+  .file-info-card {
+    padding: 15px;
+  }
+  
+  .info-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+  }
+  
+  .progress-labels {
+    font-size: 10px;
+  }
+}
+</style>

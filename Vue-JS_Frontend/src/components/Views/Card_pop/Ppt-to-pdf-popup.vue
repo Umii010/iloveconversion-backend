@@ -1,104 +1,148 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 
 const file = ref(null)
 const loading = ref(false)
 const progress = ref(0)
 const statusText = ref('')
+const timeElapsed = ref('0s')
+const estimatedTime = ref('')
+const showPopup = ref(false)
+const popupMessage = ref('')
 
-// Conversion settings
-const conversionSettings = ref({
-  quality: 'high', // 'low', 'medium', 'high'
-  slidesPerPage: 'single', // 'single', 'multiple', 'notes'
-  includeNotes: false,
-  includeHiddenSlides: false,
-  pageSize: 'A4',
-  orientation: 'portrait'
-})
+let startTime = null
+let timerInterval = null
+let fakeProgressInterval = null
 
-// Supported formats
-const supportedFormats = ref([
-  { ext: '.ppt', name: 'PowerPoint 97-2003', icon: '📊' },
-  { ext: '.pptx', name: 'PowerPoint 2007+', icon: '📊' },
-  { ext: '.pps', name: 'PowerPoint Show', icon: '🎬' },
-  { ext: '.ppsx', name: 'PowerPoint Show 2007+', icon: '🎬' },
-  { ext: '.odp', name: 'OpenDocument', icon: '📄' }
-])
+// Update elapsed time
+const updateTimer = () => {
+  if (!startTime) return
+  
+  const elapsed = Math.floor((Date.now() - startTime) / 1000)
+  const minutes = Math.floor(elapsed / 60)
+  const seconds = elapsed % 60
+  
+  if (minutes > 0) {
+    timeElapsed.value = `${minutes}m ${seconds}s`
+  } else {
+    timeElapsed.value = `${seconds}s`
+  }
+}
 
-// Quality options
-const qualityOptions = ref([
-  { id: 'low', name: 'Low Quality', desc: 'Small file size, faster conversion', size: '~50-100 KB per slide' },
-  { id: 'medium', name: 'Medium Quality', desc: 'Balanced quality and size', size: '~100-300 KB per slide' },
-  { id: 'high', name: 'High Quality', desc: 'Best quality for printing', size: '~300-800 KB per slide' }
-])
+// Start timer
+const startTimer = () => {
+  startTime = Date.now()
+  timeElapsed.value = '0s'
+  
+  if (timerInterval) clearInterval(timerInterval)
+  timerInterval = setInterval(updateTimer, 1000)
+}
 
-// Slides per page options
-const slidesPerPageOptions = ref([
-  { id: 'single', name: 'Single Slide', desc: 'One slide per page', icon: '1️⃣' },
-  { id: 'multiple', name: 'Multiple Slides', desc: '2, 4, or 6 slides per page', icon: '2️⃣' },
-  { id: 'notes', name: 'Slides with Notes', desc: 'Slide with speaker notes', icon: '📝' },
-  { id: 'handout', name: 'Handout Format', desc: 'Lines for notes', icon: '📄' }
-])
+// Stop timer
+const stopTimer = () => {
+  if (timerInterval) {
+    clearInterval(timerInterval)
+    timerInterval = null
+  }
+  updateTimer() // Final update
+}
 
+// Estimate time based on file size
+const estimateTime = (fileSizeMB) => {
+  if (fileSizeMB < 5) return '10-20 seconds'
+  if (fileSizeMB < 20) return '20-40 seconds'
+  if (fileSizeMB < 50) return '1-2 minutes'
+  return '2-5 minutes'
+}
+
+// Show popup notification
+const showNotification = (message, duration = 3000) => {
+  popupMessage.value = message
+  showPopup.value = true
+  
+  setTimeout(() => {
+    showPopup.value = false
+  }, duration)
+}
+
+// Close popup
+const closePopup = () => {
+  showPopup.value = false
+}
+
+// File selection
 const selectFile = (e) => {
   const selectedFile = e.target.files[0]
   if (!selectedFile) return
   
-  // Check file extension
+  // Check file type
   const fileName = selectedFile.name.toLowerCase()
-  const isValidFormat = supportedFormats.value.some(format => 
-    fileName.endsWith(format.ext)
-  )
+  const validExtensions = ['.ppt', '.pptx', '.pps', '.ppsx', '.odp']
+  const isValid = validExtensions.some(ext => fileName.endsWith(ext))
   
-  if (!isValidFormat) {
-    alert('Please select a PowerPoint file (.ppt, .pptx, .pps, .ppsx, .odp)')
+  if (!isValid) {
+    showNotification('Please select a PowerPoint file (.ppt, .pptx, .pps, .ppsx, .odp)', 4000)
+    e.target.value = ''
+    return
+  }
+  
+  // Check file size (max 100MB)
+  if (selectedFile.size > 100 * 1024 * 1024) {
+    showNotification('File size exceeds 100MB limit', 4000)
     e.target.value = ''
     return
   }
   
   file.value = selectedFile
-  console.log('PPT file selected:', selectedFile.name)
+  const fileSizeMB = selectedFile.size / (1024 * 1024)
+  estimatedTime.value = estimateTime(fileSizeMB)
+  
+  showNotification(`✓ ${selectedFile.name} loaded (${fileSizeMB.toFixed(1)} MB)`, 3000)
 }
 
+// Conversion function
 const convertPptToPdf = async () => {
   if (!file.value) {
-    alert('Please select a PowerPoint file')
+    showNotification('Please select a PowerPoint file first', 3000)
     return
   }
 
   loading.value = true
   progress.value = 0
-  statusText.value = 'Starting conversion...'
+  statusText.value = 'Initializing conversion...'
+  startTimer()
+  
+  // Reset popup
+  showPopup.value = false
 
   const formData = new FormData()
-  formData.append('ppt', file.value)
-  formData.append('settings', JSON.stringify(conversionSettings.value))
-
-  let fakeProgress = null
+  formData.append('file', file.value)
 
   try {
-    // Fake progress for better UX
-    fakeProgress = setInterval(() => {
-      if (progress.value < 90) {
-        progress.value += Math.random() * 10
+    // Start fake progress simulation
+    fakeProgressInterval = setInterval(() => {
+      if (progress.value < 85) {
+        // Slower progress as we advance
+        const increment = 2 + Math.random() * 3
+        progress.value = Math.min(85, progress.value + increment)
         updateStatusText(progress.value)
       }
-    }, 400)
+    }, 500)
 
-    // Call conversion API
+    // Call API
     const res = await fetch('http://192.168.18.101:3000/api/ppt-to-pdf', {
       method: 'POST',
       body: formData
     })
 
+    clearInterval(fakeProgressInterval)
+    progress.value = 95
+    statusText.value = 'Finalizing PDF...'
+
     if (!res.ok) {
       const errorText = await res.text()
       throw new Error(`Server error: ${res.status} - ${errorText}`)
     }
-
-    clearInterval(fakeProgress)
-    progress.value = 100
-    statusText.value = 'Downloading PDF...'
 
     // Get filename
     const contentDisposition = res.headers.get('content-disposition')
@@ -113,6 +157,11 @@ const convertPptToPdf = async () => {
 
     // Download the PDF
     const blob = await res.blob()
+    
+    if (blob.size === 0) {
+      throw new Error('Received empty file from server')
+    }
+    
     const url = URL.createObjectURL(blob)
 
     const a = document.createElement('a')
@@ -123,596 +172,446 @@ const convertPptToPdf = async () => {
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
 
-    statusText.value = 'Conversion completed!'
+    progress.value = 100
+    statusText.value = 'Conversion complete!'
+    
+    const totalTime = Math.floor((Date.now() - startTime) / 1000)
+    const downloadSize = (blob.size / (1024 * 1024)).toFixed(1)
+    
+    showNotification(
+      `✅ Conversion successful!\n` +
+      `⏱️ Time: ${totalTime}s\n` +
+      `📦 Size: ${downloadSize} MB\n` +
+      `📄 Saved as: ${fileName}`,
+      6000
+    )
 
   } catch (err) {
-    statusText.value = 'Conversion failed'
-    alert('Conversion failed: ' + err.message)
     console.error('PPT to PDF error:', err)
+    
+    let userMessage = 'Conversion failed. '
+    
+    if (err.message.includes('timeout')) {
+      userMessage += 'Server took too long to respond.'
+    } else if (err.message.includes('PowerPoint')) {
+      userMessage += 'PowerPoint may not be installed on server.'
+    } else {
+      userMessage += 'Please try again.'
+    }
+    
+    showNotification(`❌ ${userMessage}`, 5000)
+    statusText.value = 'Conversion failed'
+    
   } finally {
-    if (fakeProgress) clearInterval(fakeProgress)
-    loading.value = false
+    stopTimer()
+    clearInterval(fakeProgressInterval)
+    
+    // Reset after delay
     setTimeout(() => {
+      loading.value = false
       progress.value = 0
       statusText.value = ''
+      timeElapsed.value = '0s'
     }, 2000)
   }
 }
 
+// Update status text based on progress
 const updateStatusText = (progressValue) => {
-  if (progressValue < 20) {
-    statusText.value = 'Analyzing PowerPoint file...'
-  } else if (progressValue < 40) {
-    statusText.value = 'Extracting slides...'
-  } else if (progressValue < 60) {
-    statusText.value = 'Converting slides to images...'
-  } else if (progressValue < 80) {
-    statusText.value = 'Generating PDF document...'
+  if (progressValue < 10) {
+    statusText.value = 'Uploading file to server...'
+  } else if (progressValue < 25) {
+    statusText.value = 'Analyzing PowerPoint structure...'
+  } else if (progressValue < 45) {
+    statusText.value = 'Processing slides...'
+  } else if (progressValue < 65) {
+    statusText.value = 'Converting to PDF format...'
+  } else if (progressValue < 85) {
+    statusText.value = 'Optimizing PDF output...'
+  } else if (progressValue < 95) {
+    statusText.value = 'Finalizing document...'
   } else {
-    statusText.value = 'Finalizing PDF...'
+    statusText.value = 'Preparing download...'
   }
 }
 
+// Clear selected file
 const clearFile = () => {
   file.value = null
+  estimatedTime.value = ''
   const input = document.querySelector('input[type="file"]')
   if (input) input.value = ''
+  showNotification('File cleared', 2000)
 }
+
+// Clean up intervals on component unmount
+onUnmounted(() => {
+  if (timerInterval) clearInterval(timerInterval)
+  if (fakeProgressInterval) clearInterval(fakeProgressInterval)
+})
 </script>
 
 <template>
   <div class="converter">
-    <h2>PPT to PDF Converter</h2>
-    <p class="subtitle">Convert PowerPoint presentations to high-quality PDF documents</p>
+    <!-- Popup Notification -->
+    <div v-if="showPopup" class="popup-notification" :class="{ 'popup-error': popupMessage.includes('❌') }">
+      <div class="popup-content">
+        <div class="popup-message">
+          {{ popupMessage }}
+        </div>
+        <button class="popup-close" @click="closePopup">✕</button>
+      </div>
+    </div>
 
-    <!-- File Upload -->
+    <h2>📊 PowerPoint to PDF Converter</h2>
+    <p class="subtitle">Convert PPT, PPTX, PPS to high-quality PDF documents</p>
+
+    <!-- File Upload Section -->
     <label class="upload-box">
       <input
         type="file"
-        :accept="supportedFormats.map(f => f.ext).join(',')"
+        accept=".ppt,.pptx,.pps,.ppsx,.odp"
         @change="selectFile"
         hidden
       />
       <div class="upload-content">
         <span class="icon">📊</span>
-        <p><strong>Click to upload</strong> a PowerPoint file</p>
+        <p class="upload-title">Select PowerPoint File</p>
+        <p class="upload-subtitle">or drag and drop here</p>
         <div class="supported-formats">
-          <span v-for="format in supportedFormats" :key="format.ext" class="format-badge">
-            {{ format.icon }} {{ format.ext }}
-          </span>
+          <span>Supports: PPT • PPTX • PPS • PPSX • ODP</span>
         </div>
-        <small class="file-info">{{ file ? file.name : 'No file selected' }}</small>
+        <div v-if="file" class="selected-file">
+          <span class="file-icon">📄</span>
+          <span class="file-name">{{ file.name }}</span>
+          <span class="file-size">({{ (file.size / (1024 * 1024)).toFixed(1) }} MB)</span>
+        </div>
       </div>
     </label>
 
-    <!-- Conversion Settings -->
-    <div v-if="file" class="conversion-settings">
-      <h3>Conversion Settings</h3>
-      
-      <!-- Quality Settings -->
-      <div class="setting-group">
-        <h4>📈 Output Quality</h4>
-        <div class="quality-options">
-          <label 
-            v-for="quality in qualityOptions" 
-            :key="quality.id"
-            :class="['quality-option', { selected: conversionSettings.quality === quality.id }]"
-          >
-            <input 
-              type="radio" 
-              v-model="conversionSettings.quality" 
-              :value="quality.id" 
-              hidden
-            />
-            <div class="quality-content">
-              <div class="quality-header">
-                <span class="quality-name">{{ quality.name }}</span>
-                <span class="quality-size">{{ quality.size }}</span>
-              </div>
-              <p class="quality-desc">{{ quality.desc }}</p>
-            </div>
-          </label>
-        </div>
+    <!-- File Info & Stats -->
+    <div v-if="file" class="file-stats">
+      <div class="stat-item">
+        <span class="stat-label">File Name:</span>
+        <span class="stat-value">{{ file.name }}</span>
       </div>
-
-      <!-- Layout Settings -->
-      <div class="setting-group">
-        <h4>📐 Page Layout</h4>
-        <div class="layout-options">
-          <label 
-            v-for="layout in slidesPerPageOptions" 
-            :key="layout.id"
-            :class="['layout-option', { selected: conversionSettings.slidesPerPage === layout.id }]"
-          >
-            <input 
-              type="radio" 
-              v-model="conversionSettings.slidesPerPage" 
-              :value="layout.id" 
-              hidden
-            />
-            <div class="layout-content">
-              <span class="layout-icon">{{ layout.icon }}</span>
-              <div class="layout-info">
-                <span class="layout-name">{{ layout.name }}</span>
-                <span class="layout-desc">{{ layout.desc }}</span>
-              </div>
-            </div>
-          </label>
-        </div>
+      <div class="stat-item">
+        <span class="stat-label">File Size:</span>
+        <span class="stat-value">{{ (file.size / (1024 * 1024)).toFixed(2) }} MB</span>
       </div>
-
-      <!-- Additional Options -->
-      <div class="additional-options">
-        <h4>⚙️ Additional Options</h4>
-        <div class="option-grid">
-          <label class="option-item">
-            <input type="checkbox" v-model="conversionSettings.includeNotes" />
-            <span class="option-text">Include Speaker Notes</span>
-          </label>
-          <label class="option-item">
-            <input type="checkbox" v-model="conversionSettings.includeHiddenSlides" />
-            <span class="option-text">Include Hidden Slides</span>
-          </label>
-        </div>
-      </div>
-
-      <!-- Page Settings -->
-      <div class="page-settings">
-        <h4>📄 Page Settings</h4>
-        <div class="page-options">
-          <div class="page-option">
-            <label>Page Size:</label>
-            <select v-model="conversionSettings.pageSize" class="page-select">
-              <option value="A4">A4 (210 × 297 mm)</option>
-              <option value="Letter">Letter (216 × 279 mm)</option>
-              <option value="Legal">Legal (216 × 356 mm)</option>
-              <option value="A3">A3 (297 × 420 mm)</option>
-            </select>
-          </div>
-          <div class="page-option">
-            <label>Orientation:</label>
-            <select v-model="conversionSettings.orientation" class="page-select">
-              <option value="portrait">Portrait</option>
-              <option value="landscape">Landscape</option>
-            </select>
-          </div>
-        </div>
+      <div class="stat-item">
+        <span class="stat-label">Estimated Time:</span>
+        <span class="stat-value">{{ estimatedTime }}</span>
       </div>
     </div>
 
-    <!-- Preview Info -->
-    <div v-if="file" class="preview-info">
-      <div class="preview-card">
-        <div class="preview-icon">📊</div>
-        <div class="preview-details">
-          <h4>File Ready for Conversion</h4>
-          <p>{{ file.name }}</p>
-          <div class="file-stats">
-            <span>Size: {{ (file.size / 1024 / 1024).toFixed(2) }} MB</span>
-            <span>Type: {{ file.name.split('.').pop().toUpperCase() }}</span>
-          </div>
-        </div>
-      </div>
-    </div>
     <!-- Action Buttons -->
     <div class="action-buttons">
-      <button v-if="file" @click="clearFile" class="secondary-btn">
-        Clear File
+      <button 
+        v-if="file" 
+        @click="clearFile" 
+        class="secondary-btn"
+        :disabled="loading"
+      >
+        ✕ Clear File
       </button>
       <button 
         class="convert-btn" 
         @click="convertPptToPdf" 
         :disabled="loading || !file"
+        :class="{ loading: loading }"
       >
-        <span v-if="loading">🔄 Converting PPT to PDF...</span>
-        <span v-else>🚀 Convert to PDF</span>
+        <template v-if="loading">
+          <span class="spinner">⟳</span>
+          Converting... {{ progress.toFixed(0) }}%
+        </template>
+        <template v-else>
+          🚀 Convert to PDF
+        </template>
       </button>
     </div>
 
-    <!-- Status & Progress -->
-    <p v-if="loading" class="status-text">{{ statusText }}</p>
-    <div v-if="loading" class="progress-wrapper">
-      <div class="progress-bar" :style="{ width: progress + '%' }"></div>
+    <!-- Progress Section -->
+    <div v-if="loading" class="progress-section">
+      <div class="progress-header">
+        <span class="status">{{ statusText }}</span>
+        <span class="timer">⏱️ {{ timeElapsed }}</span>
+      </div>
+      
+      <div class="progress-container">
+        <div class="progress-bar">
+          <div 
+            class="progress-fill" 
+            :style="{ width: progress + '%' }"
+          >
+            <span class="progress-text">{{ progress.toFixed(0) }}%</span>
+          </div>
+        </div>
+        
+        <div class="progress-labels">
+          <span>0%</span>
+          <span>25%</span>
+          <span>50%</span>
+          <span>75%</span>
+          <span>100%</span>
+        </div>
+      </div>
+      
+      <div class="progress-stages">
+        <div class="stage" :class="{ active: progress >= 10 }">
+          <div class="stage-dot"></div>
+          <span class="stage-label">Upload</span>
+        </div>
+        <div class="stage" :class="{ active: progress >= 30 }">
+          <div class="stage-dot"></div>
+          <span class="stage-label">Analyze</span>
+        </div>
+        <div class="stage" :class="{ active: progress >= 50 }">
+          <div class="stage-dot"></div>
+          <span class="stage-label">Convert</span>
+        </div>
+        <div class="stage" :class="{ active: progress >= 80 }">
+          <div class="stage-dot"></div>
+          <span class="stage-label">Optimize</span>
+        </div>
+        <div class="stage" :class="{ active: progress >= 95 }">
+          <div class="stage-dot"></div>
+          <span class="stage-label">Download</span>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
 .converter {
-  text-align: center;
-  max-width: 800px;
+  max-width: 700px;
   margin: 0 auto;
+  padding: 30px 20px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-.converter h2 {
-  font-size: 24px;
-  margin-bottom: 8px;
-  color: #333;
+h2 {
+  font-size: 28px;
+  margin-bottom: 10px;
+  color: #2d3748;
+  text-align: center;
 }
 
 .subtitle {
+  color: #718096;
+  text-align: center;
+  margin-bottom: 40px;
+  font-size: 16px;
+}
+
+/* Popup Notification */
+.popup-notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  border-left: 5px solid #10b981;
+  z-index: 1000;
+  animation: slideIn 0.3s ease;
+  max-width: 400px;
+}
+
+.popup-notification.popup-error {
+  border-left-color: #ef4444;
+}
+
+.popup-content {
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.popup-message {
+  flex: 1;
+  white-space: pre-line;
   font-size: 14px;
-  color: #666;
-  margin-bottom: 25px;
   line-height: 1.5;
+  color: #2d3748;
+}
+
+.popup-close {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  font-size: 18px;
+  padding: 5px;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.popup-close:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 
 /* File Upload */
 .upload-box {
   display: block;
-  border: 2px dashed #aaa;
-  border-radius: 12px;
-  padding: 30px 20px;
+  border: 3px dashed #d1d5db;
+  border-radius: 16px;
+  padding: 50px 30px;
   cursor: pointer;
-  background: #f9f9f9;
-  transition: all 0.3s ease;
-  margin-bottom: 25px;
-}
-
-.upload-box:hover {
-  border-color: #8FBC5D;
-  background: #f5f9f0;
-}
-
-.upload-content .icon {
-  font-size: 42px;
-  display: block;
-  margin-bottom: 12px;
-}
-
-.supported-formats {
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 15px 0;
-}
-
-.format-badge {
-  background: #e9ecef;
-  padding: 4px 10px;
-  border-radius: 20px;
-  font-size: 12px;
-  color: #666;
-}
-
-.file-info {
-  display: block;
-  margin-top: 10px;
-  font-weight: 500;
-  color: #8FBC5D !important;
-}
-
-/* Conversion Settings */
-.conversion-settings {
-  background: #f8f9fa;
-  padding: 25px;
-  border-radius: 12px;
-  margin-bottom: 25px;
-  border: 1px solid #e9ecef;
-  text-align: left;
-}
-
-.conversion-settings h3 {
-  font-size: 18px;
-  color: #333;
-  margin: 0 0 20px 0;
+  background: #f9fafb;
+  transition: all 0.3s;
+  margin-bottom: 30px;
   text-align: center;
 }
 
-.setting-group {
-  margin-bottom: 25px;
+.upload-box:hover {
+  border-color: #8b5cf6;
+  background: #f5f3ff;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(139, 92, 246, 0.1);
 }
 
-.setting-group h4 {
-  font-size: 16px;
-  color: #333;
-  margin: 0 0 15px 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* Quality Options */
-.quality-options {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.quality-option {
-  background: white;
-  border: 2px solid #e9ecef;
-  border-radius: 8px;
-  padding: 15px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.quality-option:hover {
-  border-color: #8FBC5D;
-}
-
-.quality-option.selected {
-  border-color: #8FBC5D;
-  background: #f5f9f0;
-}
-
-.quality-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.quality-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: #333;
-}
-
-.quality-size {
-  font-size: 12px;
-  color: #666;
-  background: #f8f9fa;
-  padding: 2px 8px;
-  border-radius: 10px;
-}
-
-.quality-desc {
-  font-size: 13px;
-  color: #666;
-  margin: 0;
-  line-height: 1.5;
-}
-
-/* Layout Options */
-.layout-options {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 10px;
-}
-
-.layout-option {
-  background: white;
-  border: 2px solid #e9ecef;
-  border-radius: 8px;
-  padding: 15px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.layout-option:hover {
-  border-color: #8FBC5D;
-}
-
-.layout-option.selected {
-  border-color: #8FBC5D;
-  background: #f5f9f0;
-}
-
-.layout-content {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.layout-icon {
-  font-size: 24px;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #f8f9fa;
-  border-radius: 8px;
-}
-
-.layout-info {
-  flex: 1;
-  text-align: left;
-}
-
-.layout-name {
+.upload-content .icon {
+  font-size: 56px;
   display: block;
-  font-size: 14px;
+  margin-bottom: 15px;
+  color: #8b5cf6;
+}
+
+.upload-title {
+  font-size: 20px;
   font-weight: 600;
-  color: #333;
-  margin-bottom: 4px;
-}
-
-.layout-desc {
-  display: block;
-  font-size: 12px;
-  color: #666;
-  line-height: 1.4;
-}
-
-/* Additional Options */
-.additional-options h4 {
-  margin-bottom: 15px;
-}
-
-.option-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 15px;
-}
-
-.option-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-  font-size: 14px;
-  color: #333;
-}
-
-.option-item input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  cursor: pointer;
-  accent-color: #8FBC5D;
-}
-
-.option-text {
-  flex: 1;
-}
-
-/* Page Settings */
-.page-settings h4 {
-  margin-bottom: 15px;
-}
-
-.page-options {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 20px;
-}
-
-.page-option {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.page-option label {
-  font-size: 14px;
-  font-weight: 500;
-  color: #333;
-}
-
-.page-select {
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 14px;
-  background: white;
-  cursor: pointer;
-}
-
-.page-select:focus {
-  outline: none;
-  border-color: #8FBC5D;
-}
-
-/* Preview Info */
-.preview-info {
-  margin-bottom: 25px;
-}
-
-.preview-card {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  background: white;
-  border: 1px solid #e9ecef;
-  border-radius: 12px;
-  padding: 20px;
-  text-align: left;
-}
-
-.preview-icon {
-  font-size: 40px;
-  width: 60px;
-  height: 60px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #f5f9f0;
-  border-radius: 12px;
-}
-
-.preview-details h4 {
-  font-size: 16px;
-  color: #333;
+  color: #374151;
   margin: 0 0 8px 0;
 }
 
-.preview-details p {
+.upload-subtitle {
   font-size: 14px;
-  color: #666;
-  margin: 0 0 10px 0;
+  color: #6b7280;
+  margin: 0 0 20px 0;
 }
 
-.file-stats {
-  display: flex;
-  gap: 15px;
-  font-size: 12px;
-  color: #999;
-}
-
-/* Tips Section */
-.tips-section {
-  background: #fff8e1;
-  padding: 20px;
-  border-radius: 12px;
-  border: 1px solid #ffecb3;
+.supported-formats {
+  font-size: 13px;
+  color: #9ca3af;
   margin-bottom: 25px;
 }
 
-.tips-section h4 {
-  font-size: 16px;
-  color: #333;
-  margin: 0 0 15px 0;
-  display: flex;
+.selected-file {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  justify-content: center;
-}
-
-.tips-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 15px;
-}
-
-.tip {
-  display: flex;
-  align-items: flex-start;
   gap: 10px;
-  text-align: left;
+  background: white;
+  padding: 12px 20px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  margin-top: 15px;
 }
 
-.tip-icon {
+.file-icon {
   font-size: 20px;
-  flex-shrink: 0;
+  color: #8b5cf6;
 }
 
-.tip p {
+.file-name {
+  font-weight: 500;
+  color: #374151;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-size {
   font-size: 13px;
-  color: #666;
-  margin: 0;
-  line-height: 1.5;
+  color: #6b7280;
+}
+
+/* File Stats */
+.file-stats {
+  background: white;
+  border-radius: 12px;
+  padding: 25px;
+  margin: 25px 0;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.stat-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.stat-item:last-child {
+  border-bottom: none;
+}
+
+.stat-label {
+  font-weight: 500;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.stat-value {
+  font-weight: 600;
+  color: #374151;
+  font-size: 15px;
 }
 
 /* Action Buttons */
 .action-buttons {
   display: flex;
-  gap: 15px;
+  gap: 20px;
   justify-content: center;
-  margin: 30px 0;
+  margin: 40px 0;
 }
 
 .convert-btn {
   flex: 1;
-  max-width: 300px;
-  padding: 16px 30px;
-  font-size: 16px;
-  border-radius: 10px;
-  border: none;
-  cursor: pointer;
-  background: linear-gradient(135deg, #8FBC5D, #7CAF4D);
+  max-width: 350px;
+  padding: 20px 30px;
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
   color: white;
+  border: none;
+  border-radius: 14px;
+  font-size: 18px;
   font-weight: 600;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 12px rgba(143, 188, 93, 0.2);
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 8px 25px rgba(139, 92, 246, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 60px;
 }
 
 .convert-btn:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(143, 188, 93, 0.3);
-  background: linear-gradient(135deg, #7CAF4D, #6BA23D);
+  transform: translateY(-3px);
+  box-shadow: 0 12px 30px rgba(139, 92, 246, 0.4);
+  background: linear-gradient(135deg, #7c3aed, #6d28d9);
 }
 
 .convert-btn:disabled {
@@ -721,43 +620,293 @@ const clearFile = () => {
   transform: none !important;
 }
 
+.convert-btn.loading {
+  background: linear-gradient(135deg, #6b7280, #4b5563);
+}
+
 .secondary-btn {
-  padding: 16px 25px;
+  padding: 20px 30px;
   background: white;
-  border: 1px solid #ddd;
-  border-radius: 10px;
-  color: #666;
-  font-weight: 500;
+  border: 2px solid #d1d5db;
+  border-radius: 14px;
+  color: #6b7280;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
+  min-width: 140px;
+  font-size: 16px;
 }
 
-.secondary-btn:hover {
-  background: #f8f9fa;
-  border-color: #999;
+.secondary-btn:hover:not(:disabled) {
+  background: #f9fafb;
+  border-color: #9ca3af;
+  color: #374151;
 }
 
-/* Status & Progress */
-.status-text {
-  margin-top: 15px;
-  font-size: 14px;
-  color: #8FBC5D;
+.secondary-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.spinner {
+  display: inline-block;
+  animation: spin 1s linear infinite;
+  font-size: 20px;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Progress Section */
+.progress-section {
+  margin: 40px 0;
+  padding: 30px;
+  background: white;
+  border-radius: 16px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+}
+
+.progress-header .status {
+  font-weight: 600;
+  color: #374151;
+  font-size: 17px;
+}
+
+.progress-header .timer {
   font-weight: 500;
+  color: #8b5cf6;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 
-.progress-wrapper {
-  margin: 15px auto 25px;
-  height: 10px;
-  width: 100%;
-  max-width: 400px;
-  background: #e9ecef;
-  border-radius: 8px;
-  overflow: hidden;
+.progress-container {
+  margin-bottom: 30px;
 }
 
 .progress-bar {
+  height: 14px;
+  background: #f3f4f6;
+  border-radius: 7px;
+  overflow: hidden;
+  margin-bottom: 10px;
+  position: relative;
+}
+
+.progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #8FBC5D, #A3D47A);
-  transition: width 0.3s ease;
+  background: linear-gradient(90deg, #8b5cf6, #a78bfa);
+  border-radius: 7px;
+  transition: width 0.5s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  animation: shimmer 2s infinite;
+}
+
+.progress-text {
+  position: absolute;
+  right: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.progress-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #9ca3af;
+  padding: 0 5px;
+}
+
+.progress-stages {
+  display: flex;
+  justify-content: space-between;
+  position: relative;
+  margin-top: 40px;
+}
+
+.progress-stages::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: #f3f4f6;
+  z-index: 1;
+}
+
+.stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  z-index: 2;
+}
+
+.stage-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #f3f4f6;
+  border: 3px solid #f3f4f6;
+  margin-bottom: 8px;
+  transition: all 0.3s;
+}
+
+.stage.active .stage-dot {
+  background: white;
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
+}
+
+.stage-label {
+  font-size: 13px;
+  color: #9ca3af;
+  font-weight: 500;
+  text-align: center;
+}
+
+.stage.active .stage-label {
+  color: #374151;
+  font-weight: 600;
+}
+
+@keyframes shimmer {
+  100% { left: 100%; }
+}
+
+/* Info Box */
+.info-box {
+  background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+  border: 1px solid #bae6fd;
+  border-radius: 16px;
+  padding: 25px;
+  margin-top: 30px;
+}
+
+.info-box h4 {
+  margin: 0 0 15px 0;
+  color: #0369a1;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.info-box ul {
+  margin: 0;
+  padding-left: 20px;
+  list-style: none;
+}
+
+.info-box li {
+  margin-bottom: 10px;
+  color: #0c4a6e;
+  font-size: 15px;
+  line-height: 1.5;
+  position: relative;
+  padding-left: 25px;
+}
+
+.info-box li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  color: #10b981;
+  font-weight: bold;
+}
+
+.info-box li:last-child {
+  margin-bottom: 0;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .converter {
+    padding: 20px 15px;
+  }
+  
+  .upload-box {
+    padding: 30px 20px;
+  }
+  
+  .action-buttons {
+    flex-direction: column;
+  }
+  
+  .convert-btn,
+  .secondary-btn {
+    width: 100%;
+    max-width: none;
+  }
+  
+  .progress-section {
+    padding: 20px;
+  }
+  
+  .progress-stages {
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: space-around;
+  }
+  
+  .stage {
+    min-width: 80px;
+  }
+  
+  .popup-notification {
+    left: 20px;
+    right: 20px;
+    max-width: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .file-stats {
+    padding: 20px;
+  }
+  
+  .stat-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+  }
+  
+  .selected-file {
+    flex-direction: column;
+    text-align: center;
+    gap: 8px;
+    padding: 15px;
+  }
+  
+  .file-name {
+    max-width: 250px;
+  }
 }
 </style>

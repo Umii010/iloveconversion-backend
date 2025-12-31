@@ -1,14 +1,56 @@
 <template>
     <div class="card">
-        <div>
-            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 50 50">
-                <path fill="#8FBC5D" fill-rule="evenodd" d="M31.523 28h14.953c1.223 0 1.668.13 2.117.367.44.234.805.598 1.04 1.04.242.45.367.895.367 2.117v14.953c0 1.223-.13 1.668-.367 2.117-.234.44-.598.805-1.04 1.04-.45.242-.895.367-2.117.367H31.523c-1.223 0-1.668-.13-2.117-.367a2.52 2.52 0 0 1-1.04-1.04c-.242-.45-.367-.895-.367-2.117V31.523c0-1.223.13-1.668.367-2.117.234-.44.598-.805 1.04-1.04.45-.242.895-.367 2.117-.367zm0-28h14.953c1.223 0 1.668.13 2.117.367.44.234.805.598 1.04 1.04.242.45.367.895.367 2.117v14.953c0 1.223-.13 1.668-.367 2.117-.234.44-.598.805-1.04 1.04-.45.242-.895.367-2.117.367H31.523c-1.223 0-1.668-.13-2.117-.367a2.52 2.52 0 0 1-1.04-1.04c-.242-.45-.367-.895-.367-2.117V3.523c0-1.223.13-1.668.367-2.117.234-.44.598-.805 1.04-1.04C29.855.125 30.3 0 31.523 0m-28 28h14.953c1.223 0 1.668.13 2.117.367.44.234.805.598 1.04 1.04.242.45.367.895.367 2.117v14.953c0 1.223-.13 1.668-.367 2.117-.234.44-.598.805-1.04 1.04-.45.242-.895.367-2.117.367H3.523c-1.223 0-1.668-.13-2.117-.367a2.52 2.52 0 0 1-1.04-1.04C.125 48.145 0 47.7 0 46.477V31.523c0-1.223.13-1.668.367-2.117.234-.44.598-.805 1.04-1.04.45-.242.895-.367 2.117-.367zm0-28h14.953c1.223 0 1.668.13 2.117.367.44.234.805.598 1.04 1.04.242.45.367.895.367 2.117v14.953c0 1.223-.13 1.668-.367 2.117-.234.44-.598.805-1.04 1.04-.45.242-.895.367-2.117.367H3.523c-1.223 0-1.668-.13-2.117-.367a2.52 2.52 0 0 1-1.04-1.04C.125 20.145 0 19.7 0 18.477V3.523C0 2.3.13 1.852.367 1.406A2.56 2.56 0 0 1 1.406.367C1.855.13 2.3 0 3.523 0m0 0"></path>
-                <!-- OCR/Text Recognition Icon -->
-                <path fill="#FFF" d="M25 10c8.284 0 15 6.716 15 15 0 8.284-6.716 15-15 15-8.284 0-15-6.716-15-15 0-8.284 6.716-15 15-15zm-2 22h4v4h-4v-4zm2-12c-2.761 0-5 2.239-5 5h2c0-1.657 1.343-3 3-3s3 1.343 3 3c0 1.306-.837 2.418-2 2.83v2.17h-2v-2c0-1.103.897-2 2-2 1.657 0 3-1.343 3-3s-1.343-3-3-3z"></path>
+        <div class="icon-container">
+            <svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 64 64">
+                <!-- Main Document Background -->
+                <path fill="#4A90E2" d="M45 10H19c-1.657 0-3 1.343-3 3v38c0 1.657 1.343 3 3 3h26c1.657 0 3-1.343 3-3V13c0-1.657-1.343-3-3-3z"/>
+                
+                <!-- Document Fold -->
+                <path fill="#357ABD" d="M45 10v5c0 1.657 1.343 3 3 3h5v-3c0-1.657-1.343-3-3-3h-5z"/>
+                
+                <!-- Text Lines -->
+                <g fill="#FFFFFF">
+                    <!-- First text line (scanned text representation) -->
+                    <path d="M22 25h20v4H22z" opacity="0.8"/>
+                    <path d="M22 30h24v3H22z" opacity="0.9"/>
+                    <path d="M22 35h18v3H22z" opacity="0.7"/>
+                    <path d="M22 40h22v3H22z" opacity="0.8"/>
+                    
+                    <!-- OCR extracted text (clear text) -->
+                    <path d="M22 48h24v2H22z" opacity="1"/>
+                    <path d="M22 51h20v2H22z" opacity="1"/>
+                    <path d="M22 54h18v2H22z" opacity="1"/>
+                </g>
+                
+                <!-- OCR Lens/Magnifying Glass -->
+                <g transform="translate(40, 20)">
+                    <circle cx="8" cy="8" r="7" fill="#FF6B6B" opacity="0.9"/>
+                    <circle cx="8" cy="8" r="5" fill="#FFFFFF"/>
+                    
+                    <!-- Lens lines representing scanning -->
+                    <path d="M8 3v2M8 13v2M3 8h2M13 8h2" stroke="#FF6B6B" stroke-width="1" stroke-linecap="round"/>
+                    
+                    <!-- Handle -->
+                    <path d="M12 12l5 5" stroke="#FF6B6B" stroke-width="2" stroke-linecap="round"/>
+                </g>
+                
+                <!-- Text recognition waves -->
+                <g transform="translate(25, 25)">
+                    <path d="M0 0q2 4 4 0" stroke="#4CAF50" stroke-width="1" fill="none"/>
+                    <path d="M4 0q2 4 4 0" stroke="#4CAF50" stroke-width="1" fill="none" opacity="0.7"/>
+                    <path d="M8 0q2 4 4 0" stroke="#4CAF50" stroke-width="1" fill="none" opacity="0.5"/>
+                </g>
+                
+                <!-- AI/OCR indicator -->
+                <g transform="translate(12, 48)">
+                    <circle cx="2" cy="0" r="1.5" fill="#9C27B0"/>
+                    <circle cx="6" cy="0" r="1.5" fill="#2196F3"/>
+                    <circle cx="10" cy="0" r="1.5" fill="#4CAF50"/>
+                    <path d="M2 -2v4M6 -2v4M10 -2v4" stroke="#FFFFFF" stroke-width="0.5" stroke-linecap="round"/>
+                </g>
             </svg>
         </div>
         <h2>OCR PDF</h2>
         <p>Extract text from scanned PDFs and images using Optical Character Recognition.</p>
     </div>
 </template>
-

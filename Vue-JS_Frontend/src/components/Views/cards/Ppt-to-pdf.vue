@@ -2,9 +2,46 @@
     <div class="card">
         <div>
             <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 50 50">
-                <path fill="#8FBC5D" fill-rule="evenodd" d="M31.523 28h14.953c1.223 0 1.668.13 2.117.367.44.234.805.598 1.04 1.04.242.45.367.895.367 2.117v14.953c0 1.223-.13 1.668-.367 2.117-.234.44-.598.805-1.04 1.04-.45.242-.895.367-2.117.367H31.523c-1.223 0-1.668-.13-2.117-.367a2.52 2.52 0 0 1-1.04-1.04c-.242-.45-.367-.895-.367-2.117V31.523c0-1.223.13-1.668.367-2.117.234-.44.598-.805 1.04-1.04.45-.242.895-.367 2.117-.367zm0-28h14.953c1.223 0 1.668.13 2.117.367.44.234.805.598 1.04 1.04.242.45.367.895.367 2.117v14.953c0 1.223-.13 1.668-.367 2.117-.234.44-.598.805-1.04 1.04-.45.242-.895.367-2.117.367H31.523c-1.223 0-1.668-.13-2.117-.367a2.52 2.52 0 0 1-1.04-1.04c-.242-.45-.367-.895-.367-2.117V3.523c0-1.223.13-1.668.367-2.117.234-.44.598-.805 1.04-1.04C29.855.125 30.3 0 31.523 0m-28 28h14.953c1.223 0 1.668.13 2.117.367.44.234.805.598 1.04 1.04.242.45.367.895.367 2.117v14.953c0 1.223-.13 1.668-.367 2.117-.234.44-.598.805-1.04 1.04-.45.242-.895.367-2.117.367H3.523c-1.223 0-1.668-.13-2.117-.367a2.52 2.52 0 0 1-1.04-1.04C.125 48.145 0 47.7 0 46.477V31.523c0-1.223.13-1.668.367-2.117.234-.44.598-.805 1.04-1.04.45-.242.895-.367 2.117-.367zm0-28h14.953c1.223 0 1.668.13 2.117.367.44.234.805.598 1.04 1.04.242.45.367.895.367 2.117v14.953c0 1.223-.13 1.668-.367 2.117-.234.44-.598.805-1.04 1.04-.45.242-.895.367-2.117.367H3.523c-1.223 0-1.668-.13-2.117-.367a2.52 2.52 0 0 1-1.04-1.04C.125 20.145 0 19.7 0 18.477V3.523C0 2.3.13 1.852.367 1.406A2.56 2.56 0 0 1 1.406.367C1.855.13 2.3 0 3.523 0m0 0"></path>
-                <!-- PPT/PPTX to PDF Icon -->
-                <path fill="#FFF" d="M25 10l-5 10h10l-5-10zm0 30c-5.523 0-10-4.477-10-10s4.477-10 10-10 10 4.477 10 10-4.477 10-10 10zm0-16c-3.314 0-6 2.686-6 6s2.686 6 6 6 6-2.686 6-6-2.686-6-6-6z"></path>
+                <!-- PPT presentation (slide with content) -->
+                <rect x="10" y="12" width="16" height="20" fill="#2196F3" rx="1"/>
+                
+                <!-- Slide title bar -->
+                <rect x="10" y="12" width="16" height="4" fill="#1976D2" rx="1"/>
+                
+                <!-- Slide content -->
+                <rect x="14" y="18" width="8" height="1.5" fill="#FFFFFF" opacity="0.9"/>
+                <rect x="13" y="22" width="3" height="1" fill="#FFFFFF" opacity="0.7"/>
+                <rect x="17" y="22" width="7" height="1" fill="#FFFFFF" opacity="0.7"/>
+                <rect x="13" y="25" width="3" height="1" fill="#FFFFFF" opacity="0.7"/>
+                <rect x="17" y="25" width="9" height="1" fill="#FFFFFF" opacity="0.7"/>
+                
+                <!-- Chart in slide -->
+                <g fill="#4CAF50" opacity="0.8">
+                    <rect x="14" y="29" width="2" height="5"/>
+                    <rect x="17" y="27" width="2" height="7"/>
+                    <rect x="20" y="30" width="2" height="4"/>
+                </g>
+                
+                <!-- PDF document -->
+                <rect x="24" y="16" width="16" height="16" fill="#FF6B6B" rx="1"/>
+                
+                <!-- PDF corner fold -->
+                <path fill="#D32F2F" d="M24 16v4c0 1.1.9 2 2 2h4v-2c0-1.1-.9-2-2-2h-4z"/>
+                
+                <!-- PDF text content -->
+                <rect x="28" y="22" width="8" height="1" fill="#FFFFFF" opacity="0.8"/>
+                <rect x="28" y="25" width="10" height="1" fill="#FFFFFF" opacity="0.8"/>
+                <rect x="28" y="28" width="7" height="1" fill="#FFFFFF" opacity="0.8"/>
+                
+                <!-- Conversion arrow from PPT to PDF -->
+                <path d="M26 24l4-4M30 20v8M26 28l4 4" stroke="#FF9800" stroke-width="2" stroke-linecap="round" fill="none"/>
+                
+                <!-- Plus sign on PPT (editable) -->
+                <path d="M18 14h1M17.5 13.5v1" stroke="#FFFFFF" stroke-width="0.5" stroke-linecap="round"/>
+                
+                <!-- Lock/locked icon on PDF (final/secure) -->
+                <path d="M34 19h2v2h-2z" fill="#FFFFFF" opacity="0.6"/>
+                <circle cx="35" cy="18" r="1" fill="#FFFFFF" opacity="0.6"/>
             </svg>
         </div>
         <h2>PPT to PDF</h2>

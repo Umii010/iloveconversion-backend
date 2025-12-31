@@ -1,19 +1,52 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 
 const file = ref(null)
 const loading = ref(false)
 const progress = ref(0)
 const statusText = ref('')
 const showSuccessPopup = ref(false)
-const popupMessage = ref('')
+const conversionStats = ref(null)
+const uploadTime = ref(null)
+const conversionStartTime = ref(null)
 
-const selectFile = (e) => {
-  file.value = e.target.files[0]
+// Computed properties
+const formattedFileSize = computed(() => {
+  if (!file.value) return ''
+  return formatBytes(file.value.size)
+})
+
+const estimatedTime = computed(() => {
+  if (!file.value) return 'Select a file'
+  const sizeMB = file.value.size / (1024 * 1024)
+  const pageEstimate = Math.max(1, Math.floor(sizeMB * 5)) // Rough estimate
+  
+  if (pageEstimate < 5) return '~10-20 seconds'
+  if (pageEstimate < 20) return '~20-40 seconds'
+  if (pageEstimate < 50) return '~40-60 seconds'
+  return '~1-2 minutes'
+})
+
+// Helper functions
+const formatBytes = (bytes) => {
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
 }
 
-const closePopup = () => {
-  showSuccessPopup.value = false
+const selectFile = (e) => {
+  const selectedFile = e.target.files[0]
+  if (selectedFile) {
+    if (selectedFile.type !== 'application/pdf') {
+      alert('Please select a PDF file')
+      return
+    }
+    file.value = selectedFile
+    uploadTime.value = new Date()
+    statusText.value = `File selected: ${selectedFile.name}`
+  }
 }
 
 const pdfToPng = async () => {
@@ -24,72 +57,93 @@ const pdfToPng = async () => {
 
   loading.value = true
   progress.value = 0
-  statusText.value = 'Starting conversion...'
+  statusText.value = 'Initializing conversion...'
   showSuccessPopup.value = false
+  conversionStartTime.value = Date.now()
 
   const formData = new FormData()
   formData.append('file', file.value)
 
-  let fakeProgress = null
-
   try {
-    // Better fake progress with realistic stages
-    fakeProgress = setInterval(() => {
-      if (progress.value < 95) {
-        // Faster progress in beginning, slower toward end
-        const increment = progress.value < 70 ? 2 : 1
-        progress.value += increment
-        
-        // Update status text based on progress
-        if (progress.value < 20) {
-          statusText.value = `Uploading PDF... ${Math.round(progress.value)}%`
-        } else if (progress.value < 50) {
-          statusText.value = `Processing pages... ${Math.round(progress.value)}%`
-        } else if (progress.value < 80) {
-          statusText.value = `Converting to images... ${Math.round(progress.value)}%`
-        } else {
-          statusText.value = `Finalizing conversion... ${Math.round(progress.value)}%`
-        }
-      }
-    }, 100)
+    // Progress simulation stages
+    const progressStages = [
+      { stage: 'Uploading PDF to server...', progress: 15, time: 800 },
+      { stage: 'Analyzing document structure...', progress: 25, time: 600 },
+      { stage: 'Preparing page rendering...', progress: 35, time: 700 },
+      { stage: 'Converting pages to images...', progress: 60, time: 1500 },
+      { stage: 'Optimizing PNG quality...', progress: 80, time: 1000 },
+      { stage: 'Finalizing conversion...', progress: 95, time: 500 }
+    ]
 
+    let currentStage = 0
+
+    // Start progress simulation
+    const updateProgress = () => {
+      if (currentStage < progressStages.length) {
+        const stage = progressStages[currentStage]
+        statusText.value = stage.stage
+        progress.value = stage.progress
+        
+        // Move to next stage after delay
+        setTimeout(() => {
+          currentStage++
+          if (currentStage < progressStages.length) {
+            updateProgress()
+          }
+        }, stage.time)
+      }
+    }
+
+    updateProgress()
+
+    // Make API call
     const res = await fetch('http://192.168.18.101:3000/api/pdf-to-png', {
       method: 'POST',
       body: formData
     })
 
-    clearInterval(fakeProgress)
-    progress.value = 100
-    statusText.value = 'Conversion complete!'
-
     if (!res.ok) {
-      throw new Error('Conversion failed')
+      const errorData = await res.json().catch(() => ({}))
+      throw new Error(errorData.message || 'Conversion failed')
     }
 
-    // Get file info from headers
+    // Get stats from headers
     const originalFileName = res.headers.get('X-Original-Filename') || file.value.name
-    const pageCount = res.headers.get('X-Page-Count')
-    const isZip = res.headers.get('Content-Type')?.includes('application/zip')
+    const pageCount = res.headers.get('X-Page-Count') || '1'
+    const isZip = res.headers.get('X-Is-Zip') === 'true'
+    const imageQuality = res.headers.get('X-Image-Quality') || '150 DPI'
+    const totalSize = res.headers.get('X-Total-Size') || '0'
     
-    // Set success message
-    if (pageCount && parseInt(pageCount) > 1) {
-      popupMessage.value = `Successfully converted ${pageCount} pages to PNG images!`
-    } else {
-      popupMessage.value = 'PDF converted to PNG successfully! <br> Thanks for using our service.'
+    const endTime = Date.now()
+    const timeTaken = ((endTime - conversionStartTime.value) / 1000).toFixed(1)
+
+    // Store stats for popup
+    conversionStats.value = {
+      fileName: originalFileName,
+      pageCount: parseInt(pageCount),
+      isZip,
+      imageQuality,
+      totalSize: formatBytes(parseInt(totalSize) || 0),
+      timeTaken: `${timeTaken} seconds`,
+      originalSize: formatBytes(file.value.size),
+      timestamp: new Date().toLocaleTimeString()
     }
 
+    progress.value = 100
+    statusText.value = 'Conversion complete! Downloading...'
+
+    // Get blob and download
     const blob = await res.blob()
     const url = URL.createObjectURL(blob)
 
     // Determine download name
     let downloadName = ''
     if (isZip) {
-      downloadName = originalFileName.replace(/\.pdf$/i, '_converted.zip')
+      downloadName = originalFileName.replace(/\.pdf$/i, '_images.zip')
     } else {
       downloadName = originalFileName.replace(/\.pdf$/i, '.png')
     }
 
-    // Create and trigger download
     const a = document.createElement('a')
     a.href = url
     a.download = downloadName
@@ -99,38 +153,63 @@ const pdfToPng = async () => {
     URL.revokeObjectURL(url)
 
     // Show success popup
-    showSuccessPopup.value = true
+    setTimeout(() => {
+      showSuccessPopup.value = true
+    }, 800)
 
-    // Reset input after download
-    file.value = null
-    const input = document.querySelector('input[type="file"]')
-    if (input) input.value = ''
+    // Reset progress
+    setTimeout(() => {
+      progress.value = 0
+      statusText.value = ''
+    }, 2000)
 
   } catch (err) {
     console.error('Conversion error:', err)
-    statusText.value = 'Conversion failed'
-    popupMessage.value = '❌ Conversion failed. Please try again.'
-    showSuccessPopup.value = true
+    statusText.value = `Error: ${err.message}`
+    alert(`Conversion failed: ${err.message}`)
   } finally {
-    clearInterval(fakeProgress)
-    // Keep progress at 100% briefly before resetting
-    setTimeout(() => {
-      loading.value = false
-      setTimeout(() => {
-        progress.value = 0
-        statusText.value = ''
-      }, 1000)
-    }, 1500)
+    loading.value = false
   }
+}
+
+const closePopup = () => {
+  showSuccessPopup.value = false
+  // Reset file
+  file.value = null
+  const input = document.querySelector('input[type="file"]')
+  if (input) input.value = ''
 }
 </script>
 
 <template>
   <div class="converter">
-    <h2>PDF to PNG</h2>
+    <h2>📄 PDF to PNG Converter</h2>
     <p class="subtitle">Convert PDF pages into high-quality PNG images</p>
 
-    <label class="upload-box">
+    <!-- File Info Card -->
+    <div v-if="file" class="file-info-card">
+      <div class="file-header">
+        <span class="file-icon">📄</span>
+        <div class="file-details">
+          <strong>{{ file.name }}</strong>
+          <small>{{ formattedFileSize }} • {{ estimatedTime }}</small>
+        </div>
+        <button v-if="!loading" @click="file = null" class="remove-btn">✕</button>
+      </div>
+      <div class="file-stats">
+        <span class="stat">
+          <span class="stat-label">Size:</span>
+          <span class="stat-value">{{ formattedFileSize }}</span>
+        </span>
+        <span class="stat">
+          <span class="stat-label">Est. Time:</span>
+          <span class="stat-value">{{ estimatedTime }}</span>
+        </span>
+      </div>
+    </div>
+
+    <!-- Upload Area -->
+    <label v-if="!file" class="upload-box" @dragover.prevent @drop.prevent="selectFile">
       <input
         type="file"
         accept="application/pdf"
@@ -138,64 +217,91 @@ const pdfToPng = async () => {
         hidden
       />
       <div class="upload-content">
-        <span class="icon">📄➡️🖼️</span>
-        <p><strong>Click to upload</strong> a PDF file</p>
-        <small>{{ file ? file.name : 'No file selected' }}</small>
-        <small v-if="file" class="file-size">
-          Size: {{ (file.size / 1024 / 1024).toFixed(2) }} MB
-        </small>
+        <span class="icon">📄 → 🖼️</span>
+        <p><strong>Click to upload</strong> or drag & drop PDF</p>
+        <small>Max file size: 50MB</small>
+        <div class="conversion-info">
+          <small>✅ Converts each page to high-quality PNG</small><br>
+          <small>✅ Multiple pages = ZIP download</small>
+        </div>
       </div>
     </label>
 
+    <!-- Convert Button -->
     <button 
       class="convert-btn" 
       @click="pdfToPng" 
       :disabled="loading || !file"
-      :class="{ 'loading': loading }"
+      :class="{ 'loading': loading, 'disabled': !file }"
     >
-      <span v-if="loading">Converting... {{ Math.round(progress) }}%</span>
-      <span v-else>Convert to PNG</span>
+      <span v-if="!loading">
+        Convert to PNG
+      </span>
+      <span v-else>
+        <span class="spinner"></span> Converting...
+      </span>
     </button>
 
     <!-- Progress Section -->
-    <div v-if="loading" class="progress-container">
-      <p class="status-text">{{ statusText }}</p>
-      <div class="progress-wrapper">
-        <div class="progress-bar" :style="{ width: progress + '%' }"></div>
+    <div v-if="loading" class="progress-section">
+      <div class="progress-header">
+        <span>Conversion Progress</span>
+        <span class="time-estimate">{{ estimatedTime }}</span>
       </div>
-      <div class="progress-details">
-        <span class="progress-percent">{{ Math.round(progress) }}%</span>
-        <span class="progress-estimate" v-if="progress < 90">
-          {{ progress < 50 ? 'About 15-30 seconds remaining' : 'Almost done...' }}
-        </span>
+      
+      <div class="progress-container">
+        <div class="progress-bar" :style="{ width: progress + '%' }">
+          <span class="progress-text">{{ Math.round(progress) }}%</span>
+        </div>
+      </div>
+      
+      <p class="status-text">{{ statusText }}</p>
+      
+      <div class="progress-stats">
+        <span class="stat">Quality: 150 DPI (High)</span>
+        <span class="stat">Stage: {{ Math.floor(progress / 20) + 1 }}/6</span>
       </div>
     </div>
 
     <!-- Success Popup -->
-    <div v-if="showSuccessPopup" class="popup-overlay" @click="closePopup">
-      <div class="popup-content" @click.stop>
+    <div v-if="showSuccessPopup" class="popup-overlay" @click.self="closePopup">
+      <div class="success-popup">
         <div class="popup-header">
-          <h3>Conversion Complete</h3>
-          <button class="close-btn" @click="closePopup">×</button>
+          <h3>Conversion Successful !</h3>
+          <button class="close-popup" @click="closePopup">✕</button>
         </div>
-        <div class="popup-body">
-          <div class="success-icon">🎉</div>
-          <p>{{ popupMessage }}</p>
-          <p class="popup-note">
-            Your file has been downloaded automatically.
-            <br>
-            Check your downloads folder for the converted file.
-          </p>
-        </div>
-        <div class="popup-footer">
-          <button class="popup-btn" @click="closePopup">OK</button>
-          <button 
-            class="popup-btn secondary" 
-            @click="file = null; closePopup()"
-            v-if="file"
-          >
-            Convert Another File
-          </button>
+        
+        <div class="popup-content" v-if="conversionStats">
+          <div class="stats-summary">
+            <div class="summary-item">
+              <div class="summary-label">Original File</div>
+              <div class="summary-value">{{ conversionStats.fileName }}</div>
+            </div>
+            
+            <div class="stats-grid">
+              <div class="stat-item">
+                <div class="stat-label">Image Quality</div>
+                <div class="stat-value">{{ conversionStats.imageQuality }}</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-label">Original Size</div>
+                <div class="stat-value">{{ conversionStats.originalSize }}</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-label">Time Taken</div>
+                <div class="stat-value">{{ conversionStats.timeTaken }}</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-label">Completed</div>
+                <div class="stat-value">{{ conversionStats.timestamp }}</div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="popup-actions">
+            <button class="btn-primary" @click="closePopup">Convert Another</button>
+            <button class="btn-secondary" @click="closePopup">Close</button>
+          </div>
         </div>
       </div>
     </div>
@@ -204,14 +310,15 @@ const pdfToPng = async () => {
 
 <style scoped>
 .converter {
-  text-align: center;
-  position: relative;
+  max-width: 500px;
+  margin: 0 auto;
+  padding: 20px;
 }
 
 .converter h2 {
-  font-size: 22px;
-  margin-bottom: 4px;
-  color: #333;
+  font-size: 24px;
+  margin-bottom: 8px;
+  color: #2c3e50;
 }
 
 .subtitle {
@@ -220,11 +327,83 @@ const pdfToPng = async () => {
   margin-bottom: 25px;
 }
 
+/* File Info Card */
+.file-info-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.file-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.file-icon {
+  font-size: 24px;
+}
+
+.file-details {
+  flex: 1;
+  text-align: left;
+}
+
+.file-details strong {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 2px;
+}
+
+.file-details small {
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.remove-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.remove-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.file-stats {
+  display: flex;
+  gap: 20px;
+  font-size: 13px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.stat {
+  display: flex;
+  gap: 6px;
+}
+
+.stat-label {
+  opacity: 0.9;
+}
+
+/* Upload Box */
 .upload-box {
   display: block;
   border: 2px dashed #aaa;
   border-radius: 12px;
-  padding: 35px 20px;
+  padding: 40px 20px;
   cursor: pointer;
   background: #f9f9f9;
   transition: all 0.3s ease;
@@ -232,137 +411,148 @@ const pdfToPng = async () => {
 }
 
 .upload-box:hover {
-  border-color: #107667;
-  background: #eef7f5;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-color: #667eea;
+  background: #f0f4ff;
 }
 
 .upload-content .icon {
-  font-size: 42px;
-  margin-bottom: 15px;
+  font-size: 40px;
   display: block;
+  margin-bottom: 12px;
 }
 
 .upload-content p {
   margin: 8px 0;
-  color: #333;
   font-size: 16px;
+  color: #2c3e50;
 }
 
 .upload-content small {
-  display: block;
-  color: #666;
+  color: #6c757d;
   font-size: 13px;
-  margin-top: 5px;
 }
 
-.file-size {
-  color: #107667;
-  font-weight: 500;
-  margin-top: 8px !important;
+.conversion-info {
+  margin-top: 10px;
+  padding: 8px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  font-size: 11px;
+  color: #666;
 }
 
+/* Convert Button */
 .convert-btn {
   width: 100%;
-  padding: 14px;
-  margin-top: 20px;
+  padding: 16px;
+  font-size: 16px;
   border-radius: 10px;
   border: none;
-  background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
-  color: #fff;
-  font-size: 16px;
-  font-weight: 600;
   cursor: pointer;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-weight: 600;
   transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
+  margin-top: 10px;
 }
 
-.convert-btn:hover:not(:disabled) {
+.convert-btn:hover:not(:disabled):not(.disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(106, 17, 203, 0.3);
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
 }
 
-.convert-btn:disabled {
-  opacity: 0.6;
+.convert-btn:disabled, .convert-btn.disabled {
+  background: #ccc;
   cursor: not-allowed;
+  transform: none;
 }
 
 .convert-btn.loading {
-  background: linear-gradient(135deg, #2575fc 0%, #6a11cb 100%);
+  background: #6c757d;
 }
 
-/* Progress Container */
-.progress-container {
-  margin-top: 25px;
+.spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255,255,255,.3);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: spin 1s ease-in-out infinite;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Progress Section */
+.progress-section {
+  margin-top: 30px;
   padding: 20px;
   background: #f8f9fa;
   border-radius: 12px;
   border: 1px solid #e9ecef;
 }
 
-.status-text {
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 15px;
-  font-size: 15px;
-  color: #333;
-  font-weight: 500;
-  min-height: 24px;
+  font-size: 14px;
+  color: #2c3e50;
 }
 
-.progress-wrapper {
-  height: 12px;
+.time-estimate {
   background: #e9ecef;
-  border-radius: 10px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  color: #495057;
+}
+
+.progress-container {
+  height: 12px;
+  width: 100%;
+  background: #e9ecef;
+  border-radius: 8px;
   overflow: hidden;
   position: relative;
 }
 
 .progress-bar {
   height: 100%;
-  background: linear-gradient(90deg, #6a11cb, #2575fc);
+  background: linear-gradient(90deg, #667eea, #764ba2);
   transition: width 0.3s ease;
   position: relative;
 }
 
-.progress-bar::after {
-  content: '';
+.progress-text {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.3),
-    transparent
-  );
-  animation: shimmer 2s infinite;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  color: white;
+  font-weight: bold;
+  text-shadow: 1px 1px 1px rgba(0,0,0,0.2);
 }
 
-@keyframes shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
+.status-text {
+  margin-top: 12px;
+  font-size: 14px;
+  color: #495057;
+  min-height: 20px;
 }
 
-.progress-details {
+.progress-stats {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-top: 12px;
-  font-size: 13px;
-}
-
-.progress-percent {
-  color: #6a11cb;
-  font-weight: 600;
-  font-size: 14px;
-}
-
-.progress-estimate {
-  color: #666;
-  font-style: italic;
+  margin-top: 15px;
+  font-size: 12px;
+  color: #6c757d;
 }
 
 /* Success Popup */
@@ -377,134 +567,203 @@ const pdfToPng = async () => {
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  animation: fadeIn 0.3s ease;
+  backdrop-filter: blur(3px);
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.popup-content {
+.success-popup {
   background: white;
   border-radius: 16px;
   width: 90%;
-  max-width: 400px;
+  max-width: 500px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   overflow: hidden;
-  animation: slideUp 0.3s ease;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  animation: popupIn 0.3s ease-out;
 }
 
-@keyframes slideUp {
+@keyframes popupIn {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(20px) scale(0.95);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 
 .popup-header {
-  background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
   color: white;
   padding: 20px;
-  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .popup-header h3 {
   margin: 0;
+  flex: 1;
+  text-align: center;
   font-size: 18px;
 }
 
-.close-btn {
-  position: absolute;
-  top: 15px;
-  right: 20px;
-  background: none;
+.success-icon {
+  font-size: 24px;
+}
+
+.close-popup {
+  background: rgba(255,255,255,0.2);
   border: none;
   color: white;
-  font-size: 24px;
-  cursor: pointer;
   width: 30px;
   height: 30px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  transition: background 0.3s;
 }
 
-.close-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
+.close-popup:hover {
+  background: rgba(255,255,255,0.3);
 }
 
-.popup-body {
-  padding: 30px 20px;
+.popup-content {
+  padding: 24px;
+}
+
+.stats-summary {
+  margin-bottom: 24px;
+}
+
+.summary-item {
+  margin-bottom: 20px;
+}
+
+.summary-label {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 4px;
+}
+
+.summary-value {
+  font-size: 14px;
+  color: #2c3e50;
+  font-weight: 500;
+  word-break: break-all;
+}
+
+.conversion-type {
+  margin: 20px 0;
   text-align: center;
 }
 
-.success-icon {
-  font-size: 48px;
-  margin-bottom: 20px;
-  animation: bounce 0.5s ease;
+.type-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  border-radius: 25px;
+  font-weight: 600;
+  font-size: 14px;
 }
 
-@keyframes bounce {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.2); }
+.type-indicator.single {
+  background: linear-gradient(135deg, #e8f5e9, #d4edda);
+  color: #155724;
+  border: 2px solid #28a745;
 }
 
-.popup-body p {
-  margin: 10px 0;
-  color: #333;
-  font-size: 15px;
-  line-height: 1.5;
+.type-indicator.multi {
+  background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+  color: #0d47a1;
+  border: 2px solid #2196f3;
 }
 
-.popup-note {
-  color: #666;
-  font-size: 13px;
-  margin-top: 20px !important;
-  line-height: 1.6;
+.type-icon {
+  font-size: 20px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin: 25px 0;
+}
+
+.stat-item {
   background: #f8f9fa;
+  padding: 15px;
+  border-radius: 10px;
+  text-align: center;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.stat-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #2c3e50;
+}
+
+.download-info {
+  background: #e8f5e9;
+  padding: 15px;
+  border-radius: 10px;
+  margin-top: 20px;
+  text-align: center;
+}
+
+.download-info p {
+  margin: 0 0 8px 0;
+  color: #155724;
+  font-size: 14px;
+}
+
+.download-info small {
+  color: #666;
+  font-size: 12px;
+  display: block;
+}
+
+.popup-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.btn-primary, .btn-secondary {
+  flex: 1;
   padding: 12px;
   border-radius: 8px;
-}
-
-.popup-footer {
-  padding: 20px;
-  display: flex;
-  gap: 10px;
-  justify-content: center;
-  border-top: 1px solid #e9ecef;
-}
-
-.popup-btn {
-  padding: 10px 20px;
-  border-radius: 8px;
   border: none;
-  background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
-  color: white;
-  font-weight: 600;
   cursor: pointer;
+  font-weight: 500;
   transition: all 0.3s ease;
-  min-width: 100px;
 }
 
-.popup-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(106, 17, 203, 0.3);
+.btn-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
 }
 
-.popup-btn.secondary {
+.btn-primary:hover {
+  opacity: 0.9;
+}
+
+.btn-secondary {
   background: #6c757d;
   color: white;
 }
 
-.popup-btn.secondary:hover {
+.btn-secondary:hover {
   background: #5a6268;
-  box-shadow: 0 4px 12px rgba(108, 117, 125, 0.3);
 }
+
 </style>

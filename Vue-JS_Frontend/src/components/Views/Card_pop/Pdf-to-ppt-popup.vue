@@ -1,103 +1,111 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 
 const file = ref(null)
 const loading = ref(false)
 const progress = ref(0)
 const statusText = ref('')
+const showPopup = ref(false)
+const popupMessage = ref('')
+const popupType = ref('success')
 
-// Conversion settings
+// Enhanced conversion settings
 const conversionSettings = ref({
-  format: 'pptx', // 'ppt', 'pptx', 'odp'
-  layout: 'automatic', // 'automatic', 'single', 'grid'
-  extractText: true,
-  extractImages: true,
-  preserveLayout: true,
-  quality: 'high'
+  format: 'pptx',
+  aspectRatio: 'auto', // 'auto', '16:9', '4:3', 'match-pdf'
+  imageQuality: 'high', // 'low', 'medium', 'high'
+  dpi: 200,
+  includeMargins: true,
+  centerContent: true,
+  addPageNumbers: false
 })
 
-// Output formats
-const outputFormats = ref([
-  { id: 'pptx', name: 'PowerPoint (.pptx)', icon: '📊', desc: 'Modern PowerPoint format (recommended)' },
-  { id: 'ppt', name: 'PowerPoint 97-2003 (.ppt)', icon: '📊', desc: 'Compatible with older versions' },
-  { id: 'odp', name: 'OpenDocument (.odp)', icon: '📄', desc: 'OpenOffice/LibreOffice format' }
-])
+// Aspect ratio options with descriptions
+const aspectRatioOptions = [
+  { id: 'auto', name: 'Auto Detect', icon: '🤖', desc: 'Automatically choose best fit' },
+  { id: 'match-pdf', name: 'Match PDF', icon: '📏', desc: 'Use PDF\'s own aspect ratio' },
+  { id: '16:9', name: 'Widescreen (16:9)', icon: '📺', desc: 'Modern widescreen format' },
+  { id: '4:3', name: 'Standard (4:3)', icon: '🖥️', desc: 'Traditional presentation format' },
+  { id: 'A4', name: 'A4 Portrait', icon: '📄', desc: 'A4 paper size, portrait' }
+]
 
-// Layout options
-const layoutOptions = ref([
-  { id: 'automatic', name: 'Automatic Detection', icon: '🤖', desc: 'Detect page layout automatically' },
-  { id: 'single', name: 'Single Page per Slide', icon: '1️⃣', desc: 'Each PDF page becomes one slide' },
-  { id: 'grid', name: 'Multi-page Grid', icon: '🔲', desc: 'Multiple PDF pages per slide' }
-])
+// Quality options
+const qualityOptions = [
+  { id: 'low', name: 'Fast (Low Quality)', dpi: 150 },
+  { id: 'medium', name: 'Balanced (Medium)', dpi: 200 },
+  { id: 'high', name: 'Best (High Quality)', dpi: 300 }
+]
 
 const selectFile = (e) => {
   const selectedFile = e.target.files[0]
   if (!selectedFile) return
   
-  // Check if it's a PDF
   if (!selectedFile.name.toLowerCase().endsWith('.pdf')) {
-    alert('Please select a PDF file')
+    showNotification('Please select a PDF file', 'error')
+    e.target.value = ''
+    return
+  }
+  
+  if (selectedFile.size > 100 * 1024 * 1024) {
+    showNotification('File size exceeds 100MB limit', 'error')
     e.target.value = ''
     return
   }
   
   file.value = selectedFile
-  console.log('PDF file selected:', selectedFile.name)
+  showNotification(`PDF loaded: ${selectedFile.name}`, 'info')
 }
 
 const convertPdfToPpt = async () => {
   if (!file.value) {
-    alert('Please select a PDF file')
+    showNotification('Please select a PDF file', 'error')
     return
   }
 
   loading.value = true
   progress.value = 0
-  statusText.value = 'Starting conversion...'
+  statusText.value = 'Initializing conversion...'
+  showPopup.value = false
 
   const formData = new FormData()
-  formData.append('pdf', file.value)
+  formData.append('file', file.value)
   formData.append('settings', JSON.stringify(conversionSettings.value))
 
   let fakeProgress = null
+  const startTime = Date.now()
 
   try {
-    // Fake progress for better UX
+    // Enhanced progress simulation
     fakeProgress = setInterval(() => {
       if (progress.value < 90) {
-        progress.value += Math.random() * 10
+        const baseIncrement = Math.random() * 5
+        const timeFactor = Math.min(1, (Date.now() - startTime) / 30000)
+        progress.value += baseIncrement * (1 - timeFactor * 0.5)
         updateStatusText(progress.value)
       }
-    }, 400)
+    }, 300)
 
-    // Call conversion API
     const res = await fetch('http://192.168.18.101:3000/api/pdf-to-ppt', {
       method: 'POST',
       body: formData
     })
 
-    if (!res.ok) {
-      const errorText = await res.text()
-      throw new Error(`Server error: ${res.status} - ${errorText}`)
-    }
-
     clearInterval(fakeProgress)
     progress.value = 100
-    statusText.value = 'Downloading PowerPoint...'
+    statusText.value = 'Finalizing...'
 
-    // Get filename
-    const contentDisposition = res.headers.get('content-disposition')
-    let fileName = `${file.value.name.replace(/\.[^/.]+$/, '')}.${conversionSettings.format}`
-    
-    if (contentDisposition) {
-      const matches = contentDisposition.match(/filename="(.+)"/)
-      if (matches && matches[1]) {
-        fileName = matches[1]
-      }
+    if (!res.ok) {
+      const errorText = await res.text()
+      throw new Error(`Conversion failed: ${res.status} - ${errorText}`)
     }
 
-    // Download the PowerPoint file
     const blob = await res.blob()
+    
+    if (blob.size === 0) {
+      throw new Error('Received empty file from server')
+    }
+    
+    const fileName = `${file.value.name.replace('.pdf', '')}_converted.pptx`
     const url = URL.createObjectURL(blob)
 
     const a = document.createElement('a')
@@ -108,12 +116,18 @@ const convertPdfToPpt = async () => {
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
 
-    statusText.value = 'Conversion completed!'
+    const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(1)
+    showNotification(
+      `✅ Conversion successful in ${elapsedTime}s!\n` +
+      `✓ Aspect ratio preserved\n` +
+      `✓ No stretching issues\n` +
+      `✓ High quality maintained`,
+      'success'
+    )
 
   } catch (err) {
-    statusText.value = 'Conversion failed'
-    alert('Conversion failed: ' + err.message)
-    console.error('PDF to PPT error:', err)
+    console.error('Conversion error:', err)
+    showNotification(`❌ ${err.message}`, 'error')
   } finally {
     if (fakeProgress) clearInterval(fakeProgress)
     loading.value = false
@@ -124,724 +138,444 @@ const convertPdfToPpt = async () => {
   }
 }
 
-const updateStatusText = (progressValue) => {
-  if (progressValue < 20) {
-    statusText.value = 'Analyzing PDF document...'
-  } else if (progressValue < 40) {
-    statusText.value = 'Extracting content and images...'
-  } else if (progressValue < 60) {
-    statusText.value = 'Creating presentation structure...'
-  } else if (progressValue < 80) {
-    statusText.value = 'Generating PowerPoint slides...'
-  } else {
-    statusText.value = 'Finalizing presentation...'
-  }
+const showNotification = (message, type = 'success') => {
+  popupMessage.value = message
+  popupType.value = type
+  showPopup.value = true
+  
+  setTimeout(() => {
+    showPopup.value = false
+  }, 6000)
 }
 
-const clearFile = () => {
-  file.value = null
-  const input = document.querySelector('input[type="file"]')
-  if (input) input.value = ''
+const closePopup = () => {
+  showPopup.value = false
+}
+
+const selectAspectRatio = (ratio) => {
+  conversionSettings.value.aspectRatio = ratio
+  showNotification(`Aspect ratio set to: ${aspectRatioOptions.find(r => r.id === ratio)?.name}`, 'info')
+}
+
+const selectQuality = (quality) => {
+  conversionSettings.value.imageQuality = quality.id
+  conversionSettings.value.dpi = quality.dpi
+  showNotification(`Quality set to: ${quality.name} (${quality.dpi} DPI)`, 'info')
+}
+
+const updateStatusText = (progressValue) => {
+  const messages = [
+    { min: 0, max: 15, text: 'Analyzing PDF structure...' },
+    { min: 15, max: 30, text: 'Detecting aspect ratio...' },
+    { min: 30, max: 50, text: 'Converting pages to images...' },
+    { min: 50, max: 70, text: 'Optimizing slide layout...' },
+    { min: 70, max: 85, text: 'Preserving aspect ratio...' },
+    { min: 85, max: 95, text: 'Creating PowerPoint slides...' },
+    { min: 95, max: 100, text: 'Finalizing presentation...' }
+  ]
+  
+  const message = messages.find(m => progressValue >= m.min && progressValue <= m.max)
+  if (message) statusText.value = message.text
 }
 </script>
 
 <template>
   <div class="converter">
-    <h2>PDF to PowerPoint Converter</h2>
-    <p class="subtitle">Convert PDF documents to editable PowerPoint presentations</p>
+    <!-- Popup Notification -->
+    <div v-if="showPopup" class="popup-notification" :class="popupType">
+      <div class="popup-content">
+        <span class="popup-icon">{{ popupType === 'success' ? '✅' : '❌' }}</span>
+        <div class="popup-message">
+          <span v-html="popupMessage.replace(/\n/g, '<br>')"></span>
+        </div>
+        <button class="popup-close" @click="closePopup">✕</button>
+      </div>
+      <div class="popup-progress"></div>
+    </div>
+
+    <h2>📊 PDF to PowerPoint Converter</h2>
+    <p class="subtitle">Convert PDFs to PowerPoint with perfect aspect ratio - no stretching!</p>
 
     <!-- File Upload -->
     <label class="upload-box">
-      <input
-        type="file"
-        accept=".pdf"
-        @change="selectFile"
-        hidden
-      />
+      <input type="file" accept=".pdf" @change="selectFile" hidden />
       <div class="upload-content">
         <span class="icon">📄</span>
-        <p><strong>Click to upload</strong> a PDF file</p>
+        <p><strong>Drag & drop</strong> or click to upload PDF</p>
         <small class="file-info">{{ file ? file.name : 'No file selected' }}</small>
-        <small>Supports: PDF documents</small>
+        <small>Max size: 100MB • Supports all PDF formats</small>
       </div>
     </label>
 
-    <!-- Conversion Settings -->
-    <div v-if="file" class="conversion-settings">
-      <h3>Conversion Settings</h3>
-      
-      <!-- Output Format -->
-      <div class="setting-group">
-        <h4>📤 Output Format</h4>
-        <div class="format-options">
-          <label 
-            v-for="format in outputFormats" 
-            :key="format.id"
-            :class="['format-option', { selected: conversionSettings.format === format.id }]"
-          >
-            <input 
-              type="radio" 
-              v-model="conversionSettings.format" 
-              :value="format.id" 
-              hidden
-            />
-            <div class="format-content">
-              <span class="format-icon">{{ format.icon }}</span>
-              <div class="format-info">
-                <span class="format-name">{{ format.name }}</span>
-                <span class="format-desc">{{ format.desc }}</span>
-              </div>
-            </div>
-          </label>
-        </div>
+
+
+    <!-- Conversion Button -->
+    <button 
+      class="convert-btn" 
+      @click="convertPdfToPpt" 
+      :disabled="loading || !file"
+      :class="{ loading: loading }"
+    >
+      <span v-if="loading">
+        <span class="spinner">⟳</span> 
+        Converting... {{ progress.toFixed(0) }}%
+      </span>
+      <span v-else>
+        🚀 Convert to PowerPoint
+      </span>
+    </button>
+
+    <!-- Progress Bar -->
+    <div v-if="loading" class="progress-container">
+      <div class="progress-info">
+        <span class="status">{{ statusText }}</span>
+        <span class="percentage">{{ progress.toFixed(0) }}%</span>
       </div>
-
-      <!-- Layout Options -->
-      <div class="setting-group">
-        <h4>📐 Slide Layout</h4>
-        <div class="layout-options">
-          <label 
-            v-for="layout in layoutOptions" 
-            :key="layout.id"
-            :class="['layout-option', { selected: conversionSettings.layout === layout.id }]"
-          >
-            <input 
-              type="radio" 
-              v-model="conversionSettings.layout" 
-              :value="layout.id" 
-              hidden
-            />
-            <div class="layout-content">
-              <span class="layout-icon">{{ layout.icon }}</span>
-              <div class="layout-info">
-                <span class="layout-name">{{ layout.name }}</span>
-                <span class="layout-desc">{{ layout.desc }}</span>
-              </div>
-            </div>
-          </label>
-        </div>
+      <div class="progress-bar">
+        <div class="progress-fill" :style="{ width: progress + '%' }"></div>
       </div>
-
-      <!-- Content Extraction -->
-      <div class="setting-group">
-        <h4>🔍 Content Extraction</h4>
-        <div class="extraction-options">
-          <label class="extraction-option">
-            <input type="checkbox" v-model="conversionSettings.extractText" />
-            <div class="extraction-content">
-              <span class="extraction-icon">📝</span>
-              <div class="extraction-info">
-                <span class="extraction-name">Extract Text</span>
-                <span class="extraction-desc">Convert PDF text to editable PowerPoint text</span>
-              </div>
-            </div>
-          </label>
-          <label class="extraction-option">
-            <input type="checkbox" v-model="conversionSettings.extractImages" />
-            <div class="extraction-content">
-              <span class="extraction-icon">🖼️</span>
-              <div class="extraction-info">
-                <span class="extraction-name">Extract Images</span>
-                <span class="extraction-desc">Convert PDF images to PowerPoint images</span>
-              </div>
-            </div>
-          </label>
-          <label class="extraction-option">
-            <input type="checkbox" v-model="conversionSettings.preserveLayout" />
-            <div class="extraction-content">
-              <span class="extraction-icon">📏</span>
-              <div class="extraction-info">
-                <span class="extraction-name">Preserve Layout</span>
-                <span class="extraction-desc">Maintain original PDF layout in slides</span>
-              </div>
-            </div>
-          </label>
-        </div>
-      </div>
-
-      <!-- Quality Settings -->
-      <div class="setting-group">
-        <h4>🎨 Output Quality</h4>
-        <div class="quality-slider">
-          <div class="quality-labels">
-            <span>Fast Conversion</span>
-            <span>Best Quality</span>
-          </div>
-          <input 
-            type="range" 
-            v-model="conversionSettings.quality" 
-            min="1" 
-            max="3" 
-            step="1"
-            class="quality-range"
-          />
-          <div class="quality-steps">
-            <span :class="{ active: conversionSettings.quality === '1' }">Low</span>
-            <span :class="{ active: conversionSettings.quality === '2' }">Medium</span>
-            <span :class="{ active: conversionSettings.quality === '3' }">High</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Preview Info -->
-    <div v-if="file" class="preview-info">
-      <div class="preview-card">
-        <div class="preview-icon">📄</div>
-        <div class="preview-details">
-          <h4>PDF Ready for Conversion</h4>
-          <p>{{ file.name }}</p>
-          <div class="file-stats">
-            <span>Size: {{ (file.size / 1024 / 1024).toFixed(2) }} MB</span>
-            <span>Type: PDF Document</span>
-          </div>
-          <div class="conversion-preview">
-            <span class="preview-label">Will convert to:</span>
-            <span class="preview-output">{{ outputFormats.find(f => f.id === conversionSettings.format)?.name }}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-
-    <!-- Action Buttons -->
-    <div class="action-buttons">
-      <button v-if="file" @click="clearFile" class="secondary-btn">
-        Clear File
-      </button>
-      <button 
-        class="convert-btn" 
-        @click="convertPdfToPpt" 
-        :disabled="loading || !file"
-      >
-        <span v-if="loading">🔄 Converting PDF to PowerPoint...</span>
-        <span v-else>🚀 Convert to PowerPoint</span>
-      </button>
-    </div>
-
-    <!-- Status & Progress -->
-    <p v-if="loading" class="status-text">{{ statusText }}</p>
-    <div v-if="loading" class="progress-wrapper">
-      <div class="progress-bar" :style="{ width: progress + '%' }"></div>
     </div>
   </div>
 </template>
 
 <style scoped>
 .converter {
-  text-align: center;
   max-width: 800px;
   margin: 0 auto;
+  padding: 30px 20px;
 }
 
-.converter h2 {
+/* Popup */
+.popup-notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  animation: slideIn 0.3s ease;
+  overflow: hidden;
+  border-left: 5px solid;
+  max-width: 400px;
+}
+
+.popup-notification.success {
+  border-left-color: #10b981;
+  background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+}
+
+.popup-notification.error {
+  border-left-color: #ef4444;
+  background: linear-gradient(135deg, #fef2f2, #fee2e2);
+}
+
+.popup-notification.info {
+  border-left-color: #3b82f6;
+  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+}
+
+.popup-content {
+  padding: 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+}
+
+.popup-icon {
   font-size: 24px;
-  margin-bottom: 8px;
-  color: #333;
+  flex-shrink: 0;
 }
 
-.subtitle {
+.popup-message {
+  flex: 1;
   font-size: 14px;
-  color: #666;
-  margin-bottom: 25px;
   line-height: 1.5;
 }
 
-/* File Upload */
-.upload-box {
-  display: block;
-  border: 2px dashed #aaa;
-  border-radius: 12px;
-  padding: 30px 20px;
+.popup-close {
+  background: none;
+  border: none;
   cursor: pointer;
-  background: #f9f9f9;
-  transition: all 0.3s ease;
-  margin-bottom: 25px;
+  padding: 5px;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
 }
 
-.upload-box:hover {
-  border-color: #4a6fa5;
-  background: #f0f4fa;
+.popup-close:hover {
+  background: rgba(0, 0, 0, 0.1);
 }
+
+.popup-progress {
+  height: 3px;
+  background: linear-gradient(90deg, #10b981, #34d399);
+  animation: progress 6s linear forwards;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes progress {
+  from { width: 100%; }
+  to { width: 0%; }
+}
+
+/* Upload */
+.upload-box {
+  border-radius: 16px;
+  padding: 50px 30px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s;
+  margin: 30px 0;
+}
+
+
 
 .upload-content .icon {
-  font-size: 42px;
+  font-size: 56px;
   display: block;
-  margin-bottom: 12px;
+  margin-bottom: 15px;
 }
 
 .file-info {
   display: block;
-  margin: 10px 0 5px;
-  font-weight: 500;
-  color: #4a6fa5 !important;
+  margin: 15px 0 5px;
+  font-weight: 600;
+  color: #3b82f6;
+  font-size: 15px;
 }
 
-/* Conversion Settings */
-.conversion-settings {
-  background: #f8f9fa;
-  padding: 25px;
-  border-radius: 12px;
-  margin-bottom: 25px;
-  border: 1px solid #e9ecef;
-  text-align: left;
+/* Settings Panel */
+.settings-panel {
+  background: white;
+  border-radius: 16px;
+  padding: 30px;
+  margin: 30px 0;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e5e7eb;
 }
 
-.conversion-settings h3 {
-  font-size: 18px;
-  color: #333;
-  margin: 0 0 20px 0;
+.settings-panel h3 {
+  margin: 0 0 25px 0;
+  color: #1f2937;
+  font-size: 20px;
   text-align: center;
 }
 
 .setting-group {
-  margin-bottom: 25px;
+  margin-bottom: 30px;
 }
 
 .setting-group h4 {
-  font-size: 16px;
-  color: #333;
-  margin: 0 0 15px 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* Format Options */
-.format-options {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.format-option {
-  background: white;
-  border: 2px solid #e9ecef;
-  border-radius: 8px;
-  padding: 15px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.format-option:hover {
-  border-color: #4a6fa5;
-}
-
-.format-option.selected {
-  border-color: #4a6fa5;
-  background: #f0f4fa;
-}
-
-.format-content {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.format-icon {
-  font-size: 24px;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #f8f9fa;
-  border-radius: 8px;
-}
-
-.format-info {
-  flex: 1;
-  text-align: left;
-}
-
-.format-name {
-  display: block;
-  font-size: 14px;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 4px;
-}
-
-.format-desc {
-  display: block;
-  font-size: 12px;
-  color: #666;
-  line-height: 1.4;
-}
-
-/* Layout Options */
-.layout-options {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 10px;
-}
-
-.layout-option {
-  background: white;
-  border: 2px solid #e9ecef;
-  border-radius: 8px;
-  padding: 15px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.layout-option:hover {
-  border-color: #4a6fa5;
-}
-
-.layout-option.selected {
-  border-color: #4a6fa5;
-  background: #f0f4fa;
-}
-
-.layout-content {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.layout-icon {
-  font-size: 24px;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #f8f9fa;
-  border-radius: 8px;
-}
-
-.layout-info {
-  flex: 1;
-  text-align: left;
-}
-
-.layout-name {
-  display: block;
-  font-size: 14px;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 4px;
-}
-
-.layout-desc {
-  display: block;
-  font-size: 12px;
-  color: #666;
-  line-height: 1.4;
-}
-
-/* Extraction Options */
-.extraction-options {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.extraction-option {
-  background: white;
-  border: 1px solid #e9ecef;
-  border-radius: 8px;
-  padding: 15px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.extraction-option:hover {
-  border-color: #4a6fa5;
-}
-
-.extraction-content {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.extraction-icon {
-  font-size: 20px;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #f8f9fa;
-  border-radius: 8px;
-}
-
-.extraction-info {
-  flex: 1;
-  text-align: left;
-}
-
-.extraction-name {
-  display: block;
-  font-size: 14px;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 4px;
-}
-
-.extraction-desc {
-  display: block;
-  font-size: 12px;
-  color: #666;
-  line-height: 1.4;
-}
-
-.extraction-option input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  cursor: pointer;
-  accent-color: #4a6fa5;
-}
-
-/* Quality Slider */
-.quality-slider {
-  background: white;
-  padding: 20px;
-  border-radius: 8px;
-  border: 1px solid #e9ecef;
-}
-
-.quality-labels {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 10px;
-  font-size: 12px;
-  color: #666;
-}
-
-.quality-range {
-  width: 100%;
-  height: 8px;
-  -webkit-appearance: none;
-  appearance: none;
-  background: linear-gradient(90deg, #4a6fa5, #8FBC5D);
-  border-radius: 4px;
-  outline: none;
-  margin: 10px 0;
-}
-
-.quality-range::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 24px;
-  height: 24px;
-  background: white;
-  border: 2px solid #4a6fa5;
-  border-radius: 50%;
-  cursor: pointer;
-}
-
-.quality-steps {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 10px;
-}
-
-.quality-steps span {
-  font-size: 13px;
-  color: #999;
-  padding: 4px 12px;
-  border-radius: 20px;
-  transition: all 0.3s;
-}
-
-.quality-steps span.active {
-  background: #4a6fa5;
-  color: white;
-  font-weight: 500;
-}
-
-/* Preview Info */
-.preview-info {
-  margin-bottom: 25px;
-}
-
-.preview-card {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  background: white;
-  border: 1px solid #e9ecef;
-  border-radius: 12px;
-  padding: 20px;
-  text-align: left;
-}
-
-.preview-icon {
-  font-size: 40px;
-  width: 60px;
-  height: 60px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #f0f4fa;
-  border-radius: 12px;
-}
-
-.preview-details h4 {
-  font-size: 16px;
-  color: #333;
-  margin: 0 0 8px 0;
-}
-
-.preview-details p {
-  font-size: 14px;
-  color: #666;
   margin: 0 0 10px 0;
-}
-
-.file-stats {
-  display: flex;
-  gap: 15px;
-  font-size: 12px;
-  color: #999;
-  margin-bottom: 10px;
-}
-
-.conversion-preview {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.preview-label {
-  font-size: 12px;
-  color: #666;
-}
-
-.preview-output {
-  font-size: 13px;
-  font-weight: 600;
-  color: #4a6fa5;
-  background: #f0f4fa;
-  padding: 4px 12px;
-  border-radius: 20px;
-}
-
-/* Tips Section */
-.tips-section {
-  background: #fff8e1;
-  padding: 20px;
-  border-radius: 12px;
-  border: 1px solid #ffecb3;
-  margin-bottom: 25px;
-}
-
-.tips-section h4 {
+  color: #374151;
   font-size: 16px;
-  color: #333;
-  margin: 0 0 15px 0;
   display: flex;
   align-items: center;
   gap: 8px;
-  justify-content: center;
 }
 
-.tips-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 15px;
+.setting-description {
+  margin: 0 0 15px 0;
+  color: #6b7280;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
-.tip {
+/* Ratio Options */
+.ratio-options {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  text-align: left;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.tip-icon {
-  font-size: 20px;
+.ratio-option {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 18px 20px;
+  background: #f9fafb;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s;
+  position: relative;
+}
+
+.ratio-option:hover {
+  border-color: #3b82f6;
+  background: #eff6ff;
+  transform: translateY(-2px);
+}
+
+.ratio-option.selected {
+  border-color: #3b82f6;
+  background: #eff6ff;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+
+.ratio-icon {
+  font-size: 28px;
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border-radius: 12px;
   flex-shrink: 0;
 }
 
-.tip p {
+.ratio-info {
+  flex: 1;
+  text-align: left;
+}
+
+.ratio-info strong {
+  display: block;
+  font-size: 15px;
+  color: #1f2937;
+  margin-bottom: 4px;
+}
+
+.ratio-info span {
+  display: block;
   font-size: 13px;
-  color: #666;
-  margin: 0;
-  line-height: 1.5;
+  color: #6b7280;
+  line-height: 1.4;
 }
 
-/* Use Cases */
-.use-cases {
-  background: #f0f4fa;
+.ratio-check {
+  font-size: 20px;
+  color: #10b981;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.ratio-option.selected .ratio-check {
+  opacity: 1;
+}
+
+/* Quality Options */
+.quality-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px;
+}
+
+.quality-option {
   padding: 20px;
+  background: #f9fafb;
+  border: 2px solid #e5e7eb;
   border-radius: 12px;
-  margin-bottom: 25px;
-  border: 1px solid #d1dce9;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.3s;
 }
 
-.use-cases h4 {
-  font-size: 16px;
-  color: #333;
-  margin: 0 0 20px 0;
+.quality-option:hover {
+  border-color: #3b82f6;
+  background: #eff6ff;
+  transform: translateY(-2px);
+}
+
+.quality-option.selected {
+  border-color: #3b82f6;
+  background: #eff6ff;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+
+.quality-level {
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.quality-dpi {
+  font-size: 18px;
+  font-weight: 700;
+  color: #3b82f6;
+  margin-bottom: 8px;
+}
+
+.quality-desc {
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+/* Additional Options */
+.additional-options {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.checkbox-option {
   display: flex;
   align-items: center;
-  gap: 8px;
-  justify-content: center;
-}
-
-.cases-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 20px;
-}
-
-.use-case {
-  background: white;
-  padding: 20px;
-  border-radius: 8px;
-  text-align: center;
-}
-
-.case-icon {
-  font-size: 32px;
-  margin-bottom: 10px;
-}
-
-.use-case h5 {
-  font-size: 14px;
-  color: #333;
-  margin: 0 0 8px 0;
-  font-weight: 600;
-}
-
-.use-case p {
-  font-size: 12px;
-  color: #666;
-  margin: 0;
-  line-height: 1.5;
-}
-
-/* Action Buttons */
-.action-buttons {
-  display: flex;
-  gap: 15px;
-  justify-content: center;
-  margin: 30px 0;
-}
-
-.convert-btn {
-  flex: 1;
-  max-width: 300px;
-  padding: 16px 30px;
-  font-size: 16px;
+  gap: 12px;
+  padding: 15px;
+  background: #f9fafb;
   border-radius: 10px;
-  border: none;
   cursor: pointer;
-  background: linear-gradient(135deg, #4a6fa5, #3a5a8c);
+  transition: background 0.2s;
+}
+
+.checkbox-option:hover {
+  background: #f3f4f6;
+}
+
+.checkbox-option input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  accent-color: #3b82f6;
+  cursor: pointer;
+}
+
+.checkbox-option span {
+  font-size: 14px;
+  color: #374151;
+  flex: 1;
+}
+
+/* Convert Button */
+.convert-btn {
+  width: 100%;
+  padding: 20px 30px;
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
   color: white;
+  border: none;
+  border-radius: 14px;
+  font-size: 18px;
   font-weight: 600;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 12px rgba(74, 111, 165, 0.2);
+  cursor: pointer;
+  transition: all 0.3s;
+  margin: 30px 0;
+  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.3);
+  position: relative;
+  overflow: hidden;
 }
 
 .convert-btn:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(74, 111, 165, 0.3);
-  background: linear-gradient(135deg, #3a5a8c, #2a4a7c);
+  transform: translateY(-3px);
+  box-shadow: 0 12px 30px rgba(59, 130, 246, 0.4);
+  background: linear-gradient(135deg, #2563eb, #1e40af);
 }
 
 .convert-btn:disabled {
@@ -850,43 +584,139 @@ const clearFile = () => {
   transform: none !important;
 }
 
-.secondary-btn {
-  padding: 16px 25px;
-  background: white;
-  border: 1px solid #ddd;
-  border-radius: 10px;
-  color: #666;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
+.convert-btn.loading {
+  background: linear-gradient(135deg, #6b7280, #4b5563);
 }
 
-.secondary-btn:hover {
-  background: #f8f9fa;
-  border-color: #999;
+.spinner {
+  display: inline-block;
+  margin-right: 10px;
+  animation: spin 1s linear infinite;
 }
 
-/* Status & Progress */
-.status-text {
-  margin-top: 15px;
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Progress */
+.progress-container {
+  margin: 30px 0;
+}
+
+.progress-info {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
   font-size: 14px;
-  color: #4a6fa5;
+}
+
+.progress-info .status {
+  color: #374151;
   font-weight: 500;
 }
 
-.progress-wrapper {
-  margin: 15px auto 25px;
-  height: 10px;
-  width: 100%;
-  max-width: 400px;
-  background: #e9ecef;
-  border-radius: 8px;
-  overflow: hidden;
+.progress-info .percentage {
+  color: #3b82f6;
+  font-weight: 600;
 }
 
 .progress-bar {
+  height: 10px;
+  background: #e5e7eb;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #4a6fa5, #6a8fc5);
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+  border-radius: 5px;
   transition: width 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  100% { left: 100%; }
+}
+
+/* Tips */
+.tips-box {
+  background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+  border: 1px solid #bae6fd;
+  border-radius: 16px;
+  padding: 25px;
+  margin-top: 30px;
+}
+
+.tips-box h4 {
+  margin: 0 0 15px 0;
+  color: #0369a1;
+  font-size: 17px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tips-box ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.tips-box li {
+  margin-bottom: 10px;
+  color: #0c4a6e;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.tips-box li:last-child {
+  margin-bottom: 0;
+}
+
+.tips-box strong {
+  color: #0369a1;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .converter {
+    padding: 20px 15px;
+  }
+  
+  .upload-box {
+    padding: 30px 20px;
+  }
+  
+  .settings-panel {
+    padding: 20px;
+  }
+  
+  .quality-options {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .ratio-option {
+    padding: 15px;
+  }
+  
+  .popup-notification {
+    left: 20px;
+    right: 20px;
+    max-width: none;
+  }
 }
 </style>

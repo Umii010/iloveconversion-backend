@@ -5,82 +5,111 @@ const util = require('util');
 
 const execPromise = util.promisify(exec);
 
+const sanitizeFilename = (filename) => {
+  return filename.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+};
+
+const escapePathForWindows = (filePath) => {
+  return `"${filePath.replace(/\\/g, '/').replace(/"/g, '\\"')}"`;
+};
+
 exports.compressPdf = async (req, res) => {
+  let originalTempPath = null;
+  let sanitizedTempPath = null;
+  let outputPath = null;
+  
   try {
     if (!req.file) {
-      return res.status(400).json({ success: false, message: 'No PDF uploaded' });
+      return res.status(400).json({ 
+        success: false, 
+        message: 'No PDF uploaded' 
+      });
     }
 
-    const inputPath = req.file.path;
+    originalTempPath = req.file.path;
     const originalName = req.file.originalname;
     const originalSize = req.file.size;
-
-    console.log(`Processing: ${originalName} (${originalSize} bytes)`);
-
+    const sanitizedName = sanitizeFilename(originalName);
+    const tempDir = path.dirname(originalTempPath);
+    sanitizedTempPath = path.join(tempDir, sanitizedName);
+    
+    fs.copyFileSync(originalTempPath, sanitizedTempPath);
     const outputDir = 'uploads';
     if (!fs.existsSync(outputDir)) {
       fs.mkdirSync(outputDir, { recursive: true });
     }
-
-    const outputPath = path.join(
-      outputDir,
-      `compressed_${Date.now()}_${originalName}`
-    );
-
-    const gsPath = process.platform === 'win32'
-      ? 'gswin64c'  
-      : 'gs';
-
+    const outputName = `compressed_${Date.now()}_${sanitizedName}`;
+    outputPath = path.join(outputDir, outputName);
+    const gsPath = process.platform === 'win32' ? 'gswin64c' : 'gs';
+    const inputPathForGs = sanitizedTempPath.replace(/\\/g, '/');
+    const outputPathForGs = outputPath.replace(/\\/g, '/');
     const gsCommand = [
-      gsPath,
+      `"${gsPath}"`,
       '-sDEVICE=pdfwrite',
       '-dCompatibilityLevel=1.4',
       '-dPDFSETTINGS=/ebook',
       '-dNOPAUSE',
       '-dQUIET',
       '-dBATCH',
-      `-sOutputFile=${outputPath}`,
-      inputPath
+      '-dAutoRotatePages=/None',
+      '-dColorImageDownsampleType=/Bicubic',
+      '-dColorImageResolution=150',
+      '-dGrayImageDownsampleType=/Bicubic',
+      '-dGrayImageResolution=150',
+      '-dMonoImageDownsampleType=/Bicubic',
+      '-dMonoImageResolution=150',
+      `-sOutputFile="${outputPathForGs}"`,
+      `"${inputPathForGs}"`
     ].join(' ');
+    const { stdout, stderr } = await execPromise(gsCommand, { 
+      timeout: 180000, 
+      maxBuffer: 1024 * 1024 * 20 
+    });
 
-    console.log('Executing GhostScript command...');
-
-    await execPromise(gsCommand);
+    if (stderr && stderr.trim()) {
+      console.warn('GhostScript warnings:', stderr);
+    }
 
     if (!fs.existsSync(outputPath)) {
       throw new Error('Compressed file was not created');
     }
-
     const compressedSize = fs.statSync(outputPath).size;
-    console.log(`Compression complete: ${compressedSize} bytes`);
-
-    let reductionPercent = '0.00';
-    if (originalSize > 0 && compressedSize > 0) {
-      const percent = ((originalSize - compressedSize) / originalSize * 100);
-      reductionPercent = Math.max(0, percent).toFixed(2);
-    }
-
-    res.setHeader('X-Original-Filename', originalName);
-    res.setHeader('X-Original-Size', originalSize);
-    res.setHeader('X-Compressed-Size', compressedSize);
-    res.setHeader('X-Compression-Percent', reductionPercent);
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="compressed_${originalName}"`);
+    const reductionPercent = originalSize > 0 
+      ? Math.max(0, ((originalSize - compressedSize) / originalSize * 100)).toFixed(2)
+      : '0.00';
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="compressed_${originalName}"`,
+      'Content-Length': compressedSize,
+      'X-Original-Filename': originalName,
+      'X-Original-Size': originalSize,
+      'X-Compressed-Size': compressedSize,
+      'X-Reduction-Percent': reductionPercent,
+      'X-Compression-Ratio': originalSize > 0 ? (originalSize / compressedSize).toFixed(2) : '0.00'
+    });
 
     const fileStream = fs.createReadStream(outputPath);
-    
     fileStream.pipe(res);
 
     fileStream.on('end', () => {
-      [inputPath, outputPath].forEach(filePath => {
-        if (fs.existsSync(filePath)) {
+      setTimeout(() => {
+        const filesToDelete = [
+          originalTempPath,
+          sanitizedTempPath,
+          outputPath
+        ].filter(Boolean);
+        
+        filesToDelete.forEach(filePath => {
           try {
-            fs.unlinkSync(filePath);
+            if (fs.existsSync(filePath)) {
+              fs.unlinkSync(filePath);
+              console.log(`Cleaned up: ${filePath}`);
+            }
           } catch (err) {
             console.warn(`Could not delete ${filePath}:`, err.message);
           }
-        }
-      });
+        });
+      }, 2000);
     });
 
     fileStream.on('error', (err) => {
@@ -89,15 +118,45 @@ exports.compressPdf = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Compression error:', error);
+    console.error('Compression error:', error.message);
     
-    if (req.file && req.file.path && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
+    if (error.stdout) console.error('GhostScript stdout:', error.stdout);
+    if (error.stderr) console.error('GhostScript stderr:', error.stderr);
+    
+    const filesToDelete = [
+      originalTempPath,
+      sanitizedTempPath,
+      outputPath
+    ].filter(Boolean);
+    
+    filesToDelete.forEach(filePath => {
+      try {
+        if (filePath && fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      } catch (err) {
+        console.warn(`Cleanup error for ${filePath}:`, err.message);
+      }
+    });
+    
+    let errorMessage = 'Compression failed';
+    
+    if (error.message.includes('undefinedfilename')) {
+      errorMessage = 'Filename contains invalid characters. Please rename the file to remove parentheses, brackets, or special symbols.';
+    } else if (error.code === 'ETIMEDOUT' || error.killed) {
+      errorMessage = 'Compression timed out. The file might be too large or complex. Try a smaller file.';
+    } else if (error.message.includes('ENOENT') || error.message.includes('No such file')) {
+      errorMessage = 'File not found. The upload might have failed. Please try again.';
+    } else if (error.stderr && error.stderr.includes('Permission')) {
+      errorMessage = 'Permission error. Make sure GhostScript is installed and accessible.';
+    } else if (error.stderr && error.stderr.includes('Error')) {
+      errorMessage = 'GhostScript error. The PDF might be corrupted or password-protected.';
     }
     
     res.status(500).json({
       success: false,
-      message: 'Compression failed: ' + error.message
+      message: errorMessage,
+      detail: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
