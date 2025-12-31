@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: node-js
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
