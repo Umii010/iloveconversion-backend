@@ -10,9 +10,11 @@ app.use(express.json());
 app.use(morgan(':date[clf] ":method :url" :status :response-time ms'));
 
 const userRoutes = require('./routes/userRoutes');
-app.use('/api', userRoutes);
+const developerRoutes = require('./routes/developerRoutes');
 
-// Use Render's dynamic port
+app.use('/api', userRoutes);
+app.use('/api/developer', developerRoutes);
+
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, '0.0.0.0', () => {

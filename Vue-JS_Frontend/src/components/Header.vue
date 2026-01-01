@@ -44,11 +44,11 @@ const toggleMenu = () => {
   </li>
 
   <li>
-    <router-link to="/service" class="menu-item">
+    <router-link to="/developer-tools" class="menu-item">
       <span class="icon">
         <img src="@/assets/images/icons8-service-50.gif" class="menu-icon" />
       </span>
-      Services
+      Developer Tools
     </router-link>
   </li>
 
@@ -64,7 +64,7 @@ const toggleMenu = () => {
   <li>
     <router-link to="/features" class="menu-item">
       <span class="icon">⭐</span>
-      Features
+      QR Code
     </router-link>
   </li>
 </ul>
@@ -101,7 +101,7 @@ const toggleMenu = () => {
   <li>
     <router-link to="/features" class="menu-item">
       <span class="icon">⭐</span>
-      Features
+      QR Code
     </router-link>
   </li>
 </ul>

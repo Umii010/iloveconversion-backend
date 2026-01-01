@@ -3,7 +3,7 @@
 </script>
 
 <template>
-    <section>
+    <!-- <section>
   <span>choose a right pack</span>
   <h1>Our Flexible Pricing Plans</h1>
   <div class="cards">
@@ -78,10 +78,10 @@
       </div>
     </div>
   </div>
-</section>
+</section> -->
 </template>
 <style scoped>
-    * {
+    /* * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
@@ -119,7 +119,6 @@ h1 {
   justify-content: center;
 }
 
-/* CARD BASE */
 .card {
   width: 280px;
   cursor: pointer;
@@ -193,7 +192,6 @@ h1 {
   margin-bottom: 8px;
 }
 
-/* BUTTON */
 .card__outer a {
   text-decoration: none;
   font-weight: bold;
@@ -206,13 +204,11 @@ h1 {
   margin-left: 6px;
 }
 
-/* HOVER & ACTIVE EFFECT */
 .card:hover .card__outer,
 .card.active .card__outer {
   transform: translateY(-10px);
 }
 
-/* PURPLE */
 .card--purple .title,
 .card--purple svg,
 .card--purple a {
@@ -228,7 +224,6 @@ h1 {
   color: #fff;
 }
 
-/* RED */
 .card--red .title,
 .card--red svg,
 .card--red a {
@@ -244,7 +239,6 @@ h1 {
   color: #fff;
 }
 
-/* GREEN */
 .card--green .title,
 .card--green svg,
 .card--green a {
@@ -265,5 +259,5 @@ h1 {
   font-display: swap;
   margin-top: 1rem;
 margin-bottom: 3rem;}
-}
+} */
 </style>

@@ -1,7 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Home from '@/components/Views/Home.vue'
 import Features from '@/components/Views/Features.vue';
-
+import DeveloperTools from '@/components/Views/DeveloperToolsPage.vue'
+import DeveloperToolsPage from '@/components/Views/DeveloperToolsPage.vue';
 
 const router = createRouter({
 	history: createWebHistory(),
@@ -14,9 +15,13 @@ const router = createRouter({
 			path:'/features',
 			component: Features
 		},
+		{
+			path:'/developer-tools',
+			component: DeveloperToolsPage
+		},
         {
 			path: '/service',
-			component: () => import('@/components/Views/Service.vue')
+			component: () => import('@/components/Views/DeveloperToolsPage.vue')
 		},
 	],
 })
