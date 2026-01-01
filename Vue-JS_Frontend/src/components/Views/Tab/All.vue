@@ -4,7 +4,7 @@ import { ref } from 'vue'
 import Merge_PDF from '../cards/Merge_PDF.vue'
 import Split_PDF from '../cards/Split_PDF.vue'
 import Compress_PDF from '../cards/Compress_PDF.vue'
-import Pdf_to_word from '../cards/Pdf_to_word.vue'
+import Pdf_to_word from '../cards/pdf_to_word.vue'
 import Word_to_pdf from '../cards/Word_to_pdf.vue'
 import Pdf_to_Png from '../cards/Pdf_to_Png.vue'
 import Images_to_pdf from '../cards/Images_to_pdf.vue'
@@ -21,13 +21,14 @@ import Repairpdf from '../cards/Repair-pdf.vue'
 import Signpdf from '../cards/Sign-pdf.vue'
 import AddPageNumber from '../cards/Add-page-numbers.vue'
 import SplitPdf from '../cards/Split-pdf.vue'
+import Corruptfile from '../cards/CorruptFileCard.vue'
+import MinifyCard from '../cards/MinifyCard.vue';
   
 
 import Merge_popup from '../Card_pop/Merge_popup.vue'
 import Split_popup from '../Card_pop/Split_popup.vue'
 import Compress_popup from '../Card_pop/compress_popup.vue'
-
-import Pdf_to_word_popup from '../Card_pop/pdf_to_word_popup.vue'
+import Pdf_to_word_popup from '../Card_pop/Pdf_to_Word_popup.vue'
 import Word_to_pdf_popup from '../Card_pop/word_to_pdf_popup.vue'
 import Pdf_to_Png_popup from '../Card_pop/Pdf_to_Png_popup.vue'
 import Images_to_pdf_popup from '../Card_pop/Images_to_Pdf_popup.vue'
@@ -44,6 +45,8 @@ import Repair_pdf_popup from '../Card_pop/Repair-pdf-popup.vue'
 import Sign_pdf_popup from '../Card_pop/Sign-pdf-popup.vue'
 import Add_page_number_popup from '../Card_pop/Add-page-numbers-popup.vue'
 import Split_pdf_popup from '../Card_pop/Split_popup.vue'
+import Corrupt_file_popup from '../Card_pop/File-Corupter-popup.vue'
+import Minify_popup from '../Card_pop/MinifyPopup.vue';
 
 const CardComponent = ref(null)
 
@@ -66,7 +69,9 @@ const components = {
   Pdf_to_excel_popup,
   Repair_pdf_popup,
   Sign_pdf_popup,
-  Add_page_number_popup
+  Add_page_number_popup,
+  Corrupt_file_popup,
+  Minify_popup
   // Split_pdf_popup
 }
 
@@ -75,6 +80,8 @@ const components = {
   <div class="all__page">
     <div class="card--section">
       <Merge_PDF @click="CardComponent = 'Merge_popup'"/>
+      <Corruptfile @click="CardComponent = 'Corrupt_file_popup'"/>
+
       <Compress_PDF @click="CardComponent = 'Compress_popup'"/>
       <Pdf_to_word  @click="CardComponent = 'Pdf_to_word_popup'"/>
       <!-- <Word_to_pdf  @click="CardComponent = 'Word_to_pdf_popup'"/> -->
@@ -90,9 +97,9 @@ const components = {
       <PPttopdf @click="CardComponent = 'PPt_to_pdf_popup'"/>
       <Pdftoexcel @click="CardComponent = 'Pdf_to_excel_popup'"/>
       <Repairpdf @click="CardComponent = 'Repair_pdf_popup'"/>
-      <!-- <Signpdf @click="CardComponent = 'Sign_pdf_popup'"/> -->
-      <!-- <AddPageNumber @click="CardComponent = 'Add_page_number_popup'"/>
-      <SplitPdf @click="CardComponent = 'Split_pdf_popup'"/> -->
+       <!-- <Signpdf @click="CardComponent = 'Sign_pdf_popup'"/> --> 
+       <!-- <AddPageNumber @click="CardComponent = 'Add_page_number_popup'"/> -->
+      <MinifyCard @click="CardComponent = 'Minify_popup'"/> 
     </div>
     <div class="popup--section" v-if="CardComponent">
   <div class="popup-overlay" @click="CardComponent = null"></div>
@@ -156,20 +163,19 @@ const components = {
   backdrop-filter: blur(4px);
 }
 
-/* Popup Box */
 .popup-box {
+  top: 40px;
   position: relative;
   z-index: 10;
-  width: 520px;
+  width: 900px;
   max-width: 90%;
   background: #ffffff;
+  padding: 10px;
   border-radius: 14px;
-  padding: 30px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
   animation: popupScale 0.3s ease;
 }
 
-/* Close Button */
 .popup-close {
   position: absolute;
   top: 12px;

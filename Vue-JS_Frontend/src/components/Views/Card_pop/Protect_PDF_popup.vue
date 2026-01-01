@@ -327,12 +327,11 @@ const protectPdf = async () => {
   margin-bottom: 25px;
 }
 
-/* File Upload */
 .upload-box {
   display: block;
   border: 2px dashed #aaa;
   border-radius: 12px;
-  padding: 30px 20px;
+  padding: 20px 10px;
   cursor: pointer;
   transition: all 0.3s ease;
   background: #f9f9f9;

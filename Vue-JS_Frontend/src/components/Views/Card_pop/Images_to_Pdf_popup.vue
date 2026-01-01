@@ -277,12 +277,11 @@ const handleDrop = (e) => {
         hidden
       />
       <div class="upload-content">
-        <span class="icon">🖼️ 📷 🎬 → 📄</span>
         <p><strong>Click to upload</strong> or drag & drop images</p>
         <small>Combine multiple images into one PDF</small>
         <div class="upload-tips">
-          <small>✅ Supports: PNG, JPG, WebP, GIF, TIFF, SVG, HEIC, etc.</small><br>
-          <small>✅ Order: Images are combined in the order shown</small>
+          <small>Supports: PNG, JPG, WebP, GIF, TIFF, SVG, HEIC, etc.</small><br>
+          <small>Order: Images are combined in the order shown</small>
         </div>
       </div>
     </label>
@@ -504,16 +503,16 @@ const handleDrop = (e) => {
   align-items: center;
 }
 
-/* Upload Box */
 .upload-box {
   display: block;
   border: 2px dashed #aaa;
   border-radius: 12px;
-  padding: 40px 20px;
+  padding: 20px 10px;
   cursor: pointer;
   background: #f9f9f9;
   transition: all 0.3s ease;
   margin-bottom: 20px;
+  text-align: center;
 }
 
 .upload-box:hover, .upload-box.drag-over {

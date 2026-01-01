@@ -6,7 +6,7 @@
 <style scoped>
 footer {
     text-align: center;
-    padding: 20px;
+    padding: 5px;
     background-color: #f5f5f5;
     color: #777;
     font-size: 14px;

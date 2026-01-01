@@ -234,7 +234,6 @@ const clearFile = () => {
         hidden
       />
       <div class="upload-content">
-        <span class="icon">📄 → 📊</span>
         <p><strong>Click to upload</strong> a PDF file</p>
         <div class="file-details">
           <small class="file-info">{{ file ? file.name : 'No file selected' }}</small>
@@ -263,7 +262,7 @@ const clearFile = () => {
           Converting... {{ progress.toFixed(0) }}%
         </template>
         <template v-else>
-          🚀 Convert to Excel
+          Convert to Excel
         </template>
       </button>
     </div>
@@ -330,8 +329,8 @@ const clearFile = () => {
 }
 
 h2 {
-  font-size: 28px;
-  margin-bottom: 10px;
+  font-size: 24px;
+  font-weight: 500;
   color: #333;
   background: linear-gradient(135deg, #217346, #2e8b57);
   -webkit-background-clip: text;
@@ -341,20 +340,17 @@ h2 {
 .subtitle {
   font-size: 16px;
   color: #666;
-  margin-bottom: 30px;
   line-height: 1.5;
 }
 
-/* File Upload */
 .upload-box {
   display: block;
   border: 3px dashed #aaa;
   border-radius: 16px;
-  padding: 40px 20px;
+  padding: 20px 10px;
   cursor: pointer;
   background: #f9f9f9;
   transition: all 0.3s ease;
-  margin-bottom: 25px;
 }
 
 .upload-box:hover {
@@ -379,7 +375,6 @@ h2 {
   font-weight: 600;
   color: #217346 !important;
   font-size: 15px;
-  margin-bottom: 5px;
 }
 
 .file-size, .time-estimate {
@@ -389,38 +384,12 @@ h2 {
   margin: 3px 0;
 }
 
-/* File Info Card */
 .file-info-card {
   background: white;
   border-radius: 12px;
   padding: 20px;
-  margin: 20px 0;
   border: 1px solid #e9ecef;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-}
-
-.info-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 0;
-  border-bottom: 1px solid #f3f4f6;
-}
-
-.info-row:last-child {
-  border-bottom: none;
-}
-
-.info-label {
-  font-weight: 500;
-  color: #666;
-  font-size: 14px;
-}
-
-.info-value {
-  font-weight: 600;
-  color: #333;
-  font-size: 14px;
 }
 
 /* Action Buttons */

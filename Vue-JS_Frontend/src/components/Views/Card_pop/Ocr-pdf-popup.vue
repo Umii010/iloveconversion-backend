@@ -330,7 +330,7 @@ OCR technology continues to improve with advancements in machine learning and ar
   display: block;
   border: 2px dashed #aaa;
   border-radius: 12px;
-  padding: 30px 20px;
+  padding: 20px 10px;
   cursor: pointer;
   background: #f9f9f9;
   transition: all 0.3s ease;

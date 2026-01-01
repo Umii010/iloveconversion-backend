@@ -275,8 +275,6 @@ onUnmounted(() => {
         hidden
       />
       <div class="upload-content">
-        <span class="icon">📊</span>
-        <p class="upload-title">Select PowerPoint File</p>
         <p class="upload-subtitle">or drag and drop here</p>
         <div class="supported-formats">
           <span>Supports: PPT • PPTX • PPS • PPSX • ODP</span>
@@ -326,7 +324,7 @@ onUnmounted(() => {
           Converting... {{ progress.toFixed(0) }}%
         </template>
         <template v-else>
-          🚀 Convert to PDF
+           Convert to PDF
         </template>
       </button>
     </div>
@@ -392,16 +390,15 @@ onUnmounted(() => {
 }
 
 h2 {
-  font-size: 28px;
-  margin-bottom: 10px;
+  font-size: 24px;
   color: #2d3748;
   text-align: center;
+  font-weight: 500;
 }
 
 .subtitle {
   color: #718096;
   text-align: center;
-  margin-bottom: 40px;
   font-size: 16px;
 }
 
@@ -475,11 +472,10 @@ h2 {
   display: block;
   border: 3px dashed #d1d5db;
   border-radius: 16px;
-  padding: 50px 30px;
+  padding: 20px 10px;
   cursor: pointer;
   background: #f9fafb;
   transition: all 0.3s;
-  margin-bottom: 30px;
   text-align: center;
 }
 

@@ -235,7 +235,6 @@ const handleDrop = (e) => {
         hidden
       />
       <div class="upload-content">
-        <span class="icon">📄</span>
         <p><strong>Click to upload</strong> or drag & drop PDFs</p>
         <small>Minimum 2 files required for merge</small>
       </div>
@@ -413,7 +412,7 @@ const handleDrop = (e) => {
   display: block;
   border: 2px dashed #aaa;
   border-radius: 12px;
-  padding: 40px 20px;
+  padding: 20px 10px;
   cursor: pointer;
   transition: all 0.3s ease;
   background: #f9f9f9;

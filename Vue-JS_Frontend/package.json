@@ -13,7 +13,10 @@
   },
   "dependencies": {
     "pdfjs-dist": "^2.16.105",
+    "qr-code-styling": "^1.9.2",
+    "qrcode.vue": "^3.6.0",
     "vue": "^3.5.25",
+    "vue-qrcode": "^2.2.2",
     "vue-router": "^4.6.4"
   },
   "devDependencies": {

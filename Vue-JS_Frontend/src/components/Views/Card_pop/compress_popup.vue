@@ -355,7 +355,6 @@ const closeStats = () => {
         hidden
       />
       <div class="upload-content">
-        <span class="icon">🗜️</span>
         <p><strong>Click to upload</strong> or drag & drop PDF</p>
         <small>Max file size: 50MB </small><br>
         <small>Avoid special characters in filenames</small>
@@ -593,9 +592,10 @@ const closeStats = () => {
 /* Upload Box */
 .upload-box {
   display: block;
+  text-align: center;
   border: 2px dashed #aaa;
   border-radius: 12px;
-  padding: 40px 20px;
+  padding: 20px 10px;
   cursor: pointer;
   background: #f9f9f9;
   transition: all 0.3s ease;

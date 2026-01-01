@@ -572,9 +572,7 @@ onMounted(() => {
 
 <template>
   <div class="converter">
-    <h2>🔧 Repair PDF</h2>
-    <p class="subtitle">Fix corrupted, damaged, or unreadable PDF files with advanced repair tools</p>
-
+    <h2> Repair PDF</h2>
     <!-- File Upload -->
     <label class="upload-box" v-if="!file || repairStatus === 'idle'">
       <input name="file"
@@ -584,7 +582,6 @@ onMounted(() => {
         hidden
       />
       <div class="upload-content">
-        <span class="icon">📄</span>
         <p><strong>Click to upload</strong> a damaged PDF file</p>
         <small>{{ file ? file.name : 'No file selected' }}</small>
         <small class="hint">Supports PDF repair up to 100MB</small>
@@ -675,7 +672,7 @@ onMounted(() => {
         :class="{ disabled: loading || !file || detectedIssues.length === 0 }"
       >
         <span v-if="loading">🔄 Repairing... {{ progress.toFixed(0) }}%</span>
-        <span v-else>🚀 Repair PDF Now</span>
+        <span v-else> Repair PDF Now</span>
       </button>
     </div>
 
@@ -697,34 +694,31 @@ onMounted(() => {
 }
 
 h2 {
-  font-size: 28px;
-  margin-bottom: 10px;
+  font-size: 24px;
   color: #333;
   background: linear-gradient(135deg, #e74c3c, #c0392b);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+  font-weight: 500;
 }
 
 .subtitle {
   font-size: 16px;
   color: #666;
-  margin-bottom: 30px;
   line-height: 1.5;
 }
 
-/* File Upload */
 .upload-box {
   display: block;
   border: 3px dashed #d1d5db;
   border-radius: 16px;
-  padding: 50px 30px;
+  padding: 20px 10px;
   cursor: pointer;
   background: #f9fafb;
   transition: all 0.3s ease;
-  margin-bottom: 25px;
   max-width: 600px;
-  margin-left: auto;
-  margin-right: auto;
+  margin: auto;
+ 
 }
 
 .upload-box:hover {
@@ -737,7 +731,6 @@ h2 {
 .upload-content .icon {
   font-size: 48px;
   display: block;
-  margin-bottom: 15px;
   color: #e74c3c;
 }
 
@@ -745,7 +738,6 @@ h2 {
   font-size: 18px;
   font-weight: 600;
   color: #374151;
-  margin: 0 0 8px 0;
 }
 
 .upload-content small {
@@ -760,7 +752,6 @@ h2 {
   font-weight: 500;
 }
 
-/* Scan Results */
 .scan-results {
   background: white;
   border: 1px solid #e5e7eb;

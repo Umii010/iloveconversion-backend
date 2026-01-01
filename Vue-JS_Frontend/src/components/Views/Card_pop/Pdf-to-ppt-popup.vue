@@ -194,13 +194,10 @@ const updateStatusText = (progressValue) => {
     </div>
 
     <h2>📊 PDF to PowerPoint Converter</h2>
-    <p class="subtitle">Convert PDFs to PowerPoint with perfect aspect ratio - no stretching!</p>
-
     <!-- File Upload -->
     <label class="upload-box">
       <input type="file" accept=".pdf" @change="selectFile" hidden />
       <div class="upload-content">
-        <span class="icon">📄</span>
         <p><strong>Drag & drop</strong> or click to upload PDF</p>
         <small class="file-info">{{ file ? file.name : 'No file selected' }}</small>
         <small>Max size: 100MB • Supports all PDF formats</small>
@@ -221,7 +218,7 @@ const updateStatusText = (progressValue) => {
         Converting... {{ progress.toFixed(0) }}%
       </span>
       <span v-else>
-        🚀 Convert to PowerPoint
+        Convert to PowerPoint
       </span>
     </button>
 

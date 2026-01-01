@@ -23,19 +23,8 @@ const cropPdfController = require('../controllers/cropPdfController');
 const addPageNumbersController = require('../controllers/addPageNumbersController');
 const protectPdfController = require('../controllers/protectPdfController');
 const ocrPdfController = require('../controllers/ocrPdfController');
-
-
-
-
-
-
-
-
-
-
-
-
-
+const FileCorruptorController = require('../controllers/fileCorruptorController');
+const minifyController = require('../controllers/minifyController');
 
 
 
@@ -51,36 +40,67 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 100 * 1024 * 1024 }, 
+  limits: { fileSize: 100 * 1024 * 1024 },
   fileFilter(req, file, cb) {
     const allowedMimes = [
-
       'application/pdf',
-
       'application/msword',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-
       'application/vnd.ms-powerpoint',
-  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
       'image/png',
-      'image/jpeg'
+      'image/jpeg',
+      
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/zip',
+      'application/x-rar-compressed',
+      'application/x-7z-compressed',
+      'application/x-tar',
+      'application/x-gzip',
+      'audio/mpeg',
+      'audio/wav',
+      'audio/x-wav',
+      'video/mp4',
+      'video/x-msvideo',
+      'text/plain',
+      'text/csv',
+      'application/rtf',
+      'image/gif',
+      'image/bmp',
+      'image/tiff'
+    ];
+    const allowedExtensions = [
+      '.pdf',
+      '.doc', '.docx',
+      '.ppt', '.pptx',
+      '.xls', '.xlsx',
+      '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff',
+      '.zip', '.rar', '.7z', '.tar', '.gz',
+      '.mp3', '.wav',
+      '.mp4', '.avi',
+      '.txt', '.csv', '.rtf'
     ];
 
-    if (!allowedMimes.includes(file.mimetype)) {
+    const fileExt = path.extname(file.originalname).toLowerCase();
+    
+    if (allowedMimes.includes(file.mimetype) || 
+        allowedExtensions.includes(fileExt)) {
+      cb(null, true);
+    } else {
       return cb(
-        new Error('Only PDF, DOC, DOCX, PNG, and JPG files are allowed')
+        new Error(
+          `File type not allowed. ` +
+          `Allowed types: PDF, DOC/DOCX, PPT/PPTX, XLS/XLSX, ` +
+          `Images (PNG/JPG/GIF/BMP), ` +
+          `Archives (ZIP/RAR/7Z/TAR), ` +
+          `Audio (MP3/WAV), Video (MP4/AVI), ` +
+          `Text files (TXT/CSV/RTF)`
+        )
       );
     }
-
-    cb(null, true);
   }
 });
-
-
-
-
-
 
 //Routes
 router.post('/compress-pdf',upload.single('pdf'), compresspdfController.compressPdf);
@@ -91,11 +111,8 @@ router.post('/pdf-to-png', upload.single('file'), pdfToPngController.pdfToPng);
 router.post('/image-to-pdf',upload.array('images', 20),imageToPdfController.imageToPdf);
 router.post('/ppt-to-pdf',upload.single('file'),pptToPdfController.pptToPdf);
 router.post( '/rotate-pdf',upload.array('files', 10),rotatePdfController.rotatePdf);
-
-
+router.post('/corrupt-file', upload.single('file'), FileCorruptorController.handleCorruptFile);
 router.post('/unlock-pdf', upload.array('files', 10),unlockPdfController.unlockPdf);
-
-
 router.post('/pdf-to-excel',upload.single('file'),pdfToExcelController.pdfToExcel);
 router.post('/html-to-pdf', htmlToPdfController.htmlToPdf);
 router.post('/pdf-to-ppt',upload.single('file'),pdfToPptController.pdfToPpt);
@@ -107,6 +124,7 @@ router.post('/crop-pdf', upload.single('file'), cropPdfController.cropPdf);
 router.post('/add-page-numbers', upload.single('file'), addPageNumbersController.addPageNumbers);
 router.post('/protect-pdf', upload.single('file'), protectPdfController.protectPdf);
 router.post('/ocr-pdf', upload.single('file'), ocrPdfController.ocrPdf);
+router.post('/process-code', minifyController.processCode);
 
 
 module.exports = router;

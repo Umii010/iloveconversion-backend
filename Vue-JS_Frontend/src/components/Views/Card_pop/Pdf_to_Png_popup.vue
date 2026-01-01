@@ -217,12 +217,11 @@ const closePopup = () => {
         hidden
       />
       <div class="upload-content">
-        <span class="icon">📄 → 🖼️</span>
         <p><strong>Click to upload</strong> or drag & drop PDF</p>
         <small>Max file size: 50MB</small>
         <div class="conversion-info">
-          <small>✅ Converts each page to high-quality PNG</small><br>
-          <small>✅ Multiple pages = ZIP download</small>
+          <small> Converts each page to high-quality PNG</small><br>
+          <small>Multiple pages = ZIP download</small>
         </div>
       </div>
     </label>
@@ -401,9 +400,10 @@ const closePopup = () => {
 /* Upload Box */
 .upload-box {
   display: block;
+  text-align: center;
   border: 2px dashed #aaa;
   border-radius: 12px;
-  padding: 40px 20px;
+  padding: 20px 10px;
   cursor: pointer;
   background: #f9f9f9;
   transition: all 0.3s ease;
