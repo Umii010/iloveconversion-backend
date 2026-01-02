@@ -11,9 +11,13 @@ app.use(morgan(':date[clf] ":method :url" :status :response-time ms'));
 
 const userRoutes = require('./routes/userRoutes');
 const developerRoutes = require('./routes/developerRoutes');
+const codeDiffRoutes = require('./routes/codeDiffRoutes');
+
 
 app.use('/api', userRoutes);
 app.use('/api/developer', developerRoutes);
+app.use('/api/code-diff', codeDiffRoutes);
+
 
 const PORT = process.env.PORT || 3000;
 
