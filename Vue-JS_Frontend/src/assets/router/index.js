@@ -22,7 +22,7 @@ const router = createRouter({
 			component: CodeDiffTool
 		},
 		{
-			path:'/features',
+			path:'/qr-code',
 			component: Features
 		},
 		{

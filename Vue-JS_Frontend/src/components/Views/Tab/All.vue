@@ -203,6 +203,10 @@ const components = {
   }
 }
 @media (max-width: 1024px){
+  .popup-box{
+    top: 0;
+  }
+  
     .card--section {
         width: 100%;
         flex-wrap: wrap;
@@ -216,5 +220,6 @@ const components = {
   .card{
     width: auto;
   }
+ 
 }
 </style>

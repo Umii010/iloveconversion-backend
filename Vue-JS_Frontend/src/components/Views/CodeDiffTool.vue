@@ -753,6 +753,11 @@ onMounted(() => {
   .editors-section {
     grid-template-columns: 1fr;
   }
+  .page-content{
+    padding-inline: 10px;
+  }
+  .code-input{
+    padding: 10px 0px 0px 60px !important;  }
 }
 
 .editor-container {
@@ -1185,9 +1190,7 @@ onMounted(() => {
 /* Responsive Design */
 @media (max-width: 768px) {
   .header-content {
-    flex-direction: column;
     align-items: flex-start;
-    gap: 16px;
   }
   
   .controls {
@@ -1206,11 +1209,6 @@ onMounted(() => {
     gap: 8px;
   }
   
-  .diff-indicator {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
-  }
   
   .code-editor-wrapper {
     height: 400px;
@@ -1233,19 +1231,6 @@ onMounted(() => {
   .page-subtitle {
     font-size: 0.875rem;
   }
-  
-  .line-numbers {
-    width: 40px;
-  }
-  
-  .code-content {
-    padding-left: 16px;
-  }
-  
-  .code-input {
-    padding-left: 60px;
-  }
-  
   .code-editor-wrapper {
     height: 350px;
   }

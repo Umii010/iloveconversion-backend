@@ -939,6 +939,9 @@ onMounted(() => {
     grid-template-columns: 1fr;
     gap: 24px;
   }
+  .qr-display{
+    display: block;
+  }
   
   .generator-header {
     padding: 20px 0;
