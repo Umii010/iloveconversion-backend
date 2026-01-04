@@ -1,13 +1,15 @@
-// controllers/minifyController.js - SIMPLER VERSION
 const UglifyJS = require("uglify-js");
 const CleanCSS = require("clean-css");
 const prettier = require("prettier");
+const Logger = require('../services/logger');
 
 exports.processCode = async (req, res) => {
   try {
     const { code, language, action, options } = req.body;
 
     if (!code || !language) {
+            Logger.logUsage(req, 'code_minify', false).catch(() => {});
+
       return res.status(400).json({ 
         error: "Code and language are required" 
       });
@@ -22,6 +24,8 @@ exports.processCode = async (req, res) => {
     } else if (language === "js") {
       processedCode = await processJavaScript(code, action, options);
     } else {
+            Logger.logUsage(req, 'code_minify', false).catch(() => {});
+
       return res.status(400).json({ 
         error: "Unsupported language. Use 'css' or 'js'" 
       });
@@ -32,6 +36,7 @@ exports.processCode = async (req, res) => {
     const reduction = originalSize > 0 
       ? ((originalSize - processedSize) / originalSize * 100).toFixed(2)
       : 0;
+    Logger.logUsage(req, 'code_minify', true).catch(() => {});
 
     res.json({
       success: true,
@@ -45,6 +50,8 @@ exports.processCode = async (req, res) => {
 
   } catch (error) {
     console.error("Processing error:", error);
+        Logger.logUsage(req, 'code_minify', false).catch(() => {});
+
     res.status(500).json({ 
       error: "Failed to process code",
       message: error.message

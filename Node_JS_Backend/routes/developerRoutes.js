@@ -23,13 +23,13 @@ router.post('/format-json', developerController.formatJson);
 router.post('/minify-json', developerController.minifyJson);
 router.post('/validate-json', developerController.validateJson);
 
-router.get('/test', (req, res) => {
-    console.log('Test endpoint hit!');
-    res.json({ 
-        success: true, 
-        message: 'API is working!',
-        timestamp: new Date().toISOString()
-    });
-});
+// router.get('/test', (req, res) => {
+//     console.log('Test endpoint hit!');
+//     res.json({ 
+//         success: true, 
+//         message: 'API is working!',
+//         timestamp: new Date().toISOString()
+//     });
+// });
 
 module.exports = router;

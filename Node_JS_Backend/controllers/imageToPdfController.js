@@ -3,6 +3,7 @@ const os = require('os');
 const fs = require('fs');
 const { exec } = require('child_process');
 const util = require('util');
+const Logger = require('../services/logger');
 
 const execPromise = util.promisify(exec);
 const MAGICK_PATH = process.platform === 'win32' 
@@ -46,6 +47,8 @@ exports.imageToPdf = async (req, res) => {
       const ext = path.extname(file.originalname).toLowerCase();
       
       if (!SUPPORTED_FORMATS.includes(ext)) {
+                Logger.logUsage(req, 'image_to_pdf', false).catch(() => {});
+
         throw new Error(`Unsupported file type: ${ext}. Supported formats: PNG, JPG, JPEG, WebP, BMP, GIF, TIFF, SVG, ICO, HEIC`);
       }
 
@@ -87,6 +90,8 @@ exports.imageToPdf = async (req, res) => {
     tempFiles.push(outputPdf);
     const avgImageSize = totalOriginalSize / totalImages;
     const compressionRatio = totalOriginalSize > 0 ? (totalOriginalSize / pdfSize).toFixed(2) : '0.00';
+        Logger.logUsage(req, 'image_to_pdf', true).catch(() => {});
+
 
     res.set({
       'Content-Type': 'application/pdf',

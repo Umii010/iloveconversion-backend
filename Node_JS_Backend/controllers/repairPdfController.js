@@ -3,13 +3,13 @@ const os = require('os');
 const fs = require('fs');
 const { exec } = require('child_process');
 const util = require('util');
-
+const Logger = require('../services/logger');
 const execPromise = util.promisify(require('child_process').exec);
 
 exports.repairPdf = async (req, res) => {
-  console.log('🔧 Starting comprehensive PDF repair...');
-  
   if (!req.file) {
+        Logger.logUsage(req, 'pdf_repair', false).catch(() => {});
+
     return res.status(400).json({ 
       success: false, 
       message: 'No PDF uploaded' 
@@ -19,67 +19,45 @@ exports.repairPdf = async (req, res) => {
   const inputPath = req.file.path;
   const originalName = path.parse(req.file.originalname).name;
   const outputPath = path.join(os.tmpdir(), `${originalName}_repaired.pdf`);
-
-  console.log(`📄 Input: ${inputPath}`);
-  console.log(`📄 Output: ${outputPath}`);
-
   const pythonPath = `"C:\\Users\\Admin\\AppData\\Local\\Python\\pythoncore-3.10-64\\python.exe"`;
   const scriptPath = path.join(__dirname, 'repair_pdf.py');
-
   const command = `${pythonPath} "${scriptPath}" "${inputPath}" "${outputPath}" 2>&1`;
 
-  console.log(`⚡ Executing: ${command}`);
-
   try {
-    // Check dependencies first
-    console.log('🔍 Checking Python packages...');
     try {
       const checkCmd = `${pythonPath} -c "import pikepdf, pypdf; print('Dependencies OK')"`;
       await execPromise(checkCmd, { timeout: 10000 });
-      console.log('✅ Dependencies available');
     } catch (checkError) {
-      console.log('⚠️ Missing packages. Will use fallback methods.');
     }
 
-    // Execute repair
-    console.log('🛠️ Performing comprehensive repair...');
-    const startTime = Date.now();
-    
+    const startTime = Date.now(); 
     const { stdout, stderr } = await execPromise(command, {
       maxBuffer: 10 * 1024 * 1024,
       encoding: 'utf8',
-      timeout: 300000 // 5 minutes
+      timeout: 300000 
     });
 
-    const processingTime = ((Date.now() - startTime) / 1000).toFixed(1);
-    console.log(`⏱️ Total time: ${processingTime}s`);
-    
-    // Parse JSON output from Python script
+    const processingTime = ((Date.now() - startTime) / 1000).toFixed(1);    
     let repairReport;
     try {
       repairReport = JSON.parse(stdout);
-      console.log('📊 Repair report:', JSON.stringify(repairReport, null, 2));
     } catch (parseError) {
-      console.error('❌ Failed to parse repair report:', parseError);
-      console.log('Raw output:', stdout);
+      console.error('Failed to parse repair report:', parseError);
       repairReport = {
         success: false,
         final_status: 'error',
         message: 'Failed to parse repair results'
       };
     }
-
-    // Check if output file exists
     if (!fs.existsSync(outputPath)) {
-      console.error('❌ No output file created');
+      console.error('No output file created');
+            Logger.logUsage(req, 'pdf_repair', false).catch(() => {});
+
       throw new Error('Repair process failed - no output generated');
     }
 
     const finalSize = fs.statSync(outputPath).size;
-    console.log(`📦 Final file size: ${finalSize} bytes`);
-
-    // Determine the actual result
-    const isErrorReport = finalSize < 2000; // Error reports are small
+    const isErrorReport = finalSize < 2000;
     const content = fs.readFileSync(outputPath, 'latin1');
     const containsError = content.includes('PDF REPAIR FAILED') || 
                          content.includes('Repair Failed') ||
@@ -91,8 +69,12 @@ exports.repairPdf = async (req, res) => {
                               repairReport.final_status !== 'failed' &&
                               repairReport.final_status !== 'error';
 
-    // Prepare response based on actual result
-    let responseData = {
+ if (isActuallyRepaired) {
+      Logger.logUsage(req, 'pdf_repair', true).catch(() => {}); 
+    } else {
+      Logger.logUsage(req, 'pdf_repair', false).catch(() => {});
+    } 
+       let responseData = {
       processing_time: `${processingTime}s`,
       original_size: repairReport.original_size ? `${(repairReport.original_size / 1024 / 1024).toFixed(2)} MB` : 'Unknown',
       new_size: `${(finalSize / 1024).toFixed(2)} KB`,
@@ -101,7 +83,6 @@ exports.repairPdf = async (req, res) => {
       final_status: repairReport.final_status || 'unknown'
     };
 
-    // Set appropriate filename
     let fileName;
     if (isActuallyRepaired) {
       fileName = `${originalName}_repaired.pdf`;
@@ -119,7 +100,6 @@ exports.repairPdf = async (req, res) => {
       ];
     }
 
-    // Send the file with appropriate headers
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
     res.setHeader('X-Repair-Status', isActuallyRepaired ? 'repaired' : 'failed');
@@ -127,18 +107,17 @@ exports.repairPdf = async (req, res) => {
 
     const fileStream = fs.createReadStream(outputPath);
     fileStream.pipe(res);
-    
-    // Cleanup
-    fileStream.on('close', () => {
+        fileStream.on('close', () => {
       setTimeout(() => {
         try { fs.unlinkSync(inputPath); } catch {}
         try { fs.unlinkSync(outputPath); } catch {}
-        console.log('🧹 Temporary files cleaned');
       }, 3000);
     });
 
   } catch (error) {
-    console.error('❌ Repair process failed:', error);
+    console.error('Repair process failed:', error);
+        Logger.logUsage(req, 'pdf_repair', false).catch(() => {});
+
     
     try { fs.unlinkSync(inputPath); } catch {}
     

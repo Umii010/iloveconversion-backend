@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { exec } = require('child_process');
 const util = require('util');
+const Logger = require('../services/logger');
 
 const execPromise = util.promisify(exec);
 
@@ -19,6 +20,8 @@ exports.compressPdf = async (req, res) => {
   let outputPath = null;
   
   try {
+    
+
     if (!req.file) {
       return res.status(400).json({ 
         success: false, 
@@ -77,6 +80,7 @@ exports.compressPdf = async (req, res) => {
     const reductionPercent = originalSize > 0 
       ? Math.max(0, ((originalSize - compressedSize) / originalSize * 100)).toFixed(2)
       : '0.00';
+      Logger.logUsage(req, 'pdf_compress', true).catch(() => {}); 
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="compressed_${originalName}"`,
@@ -111,7 +115,7 @@ exports.compressPdf = async (req, res) => {
         });
       }, 2000);
     });
-
+  
     fileStream.on('error', (err) => {
       console.error('Stream error:', err);
       res.status(500).end();
@@ -119,7 +123,7 @@ exports.compressPdf = async (req, res) => {
 
   } catch (error) {
     console.error('Compression error:', error.message);
-    
+     Logger.logUsage(req, 'pdf_compress', false).catch(() => {}); 
     if (error.stdout) console.error('GhostScript stdout:', error.stdout);
     if (error.stderr) console.error('GhostScript stderr:', error.stderr);
     

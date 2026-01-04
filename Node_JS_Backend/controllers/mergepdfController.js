@@ -2,10 +2,13 @@ const fs = require('fs');
 const path = require('path');
 const { PDFDocument } = require('pdf-lib');
 const pdf = require('pdf-parse');
+const Logger = require('../services/logger');
 
 exports.mergePdfs = async (req, res) => {
   try {
     if (!req.files || req.files.length < 2) {
+            Logger.logUsage(req, 'pdf_merge', false).catch(() => {});
+
       return res.status(400).json({
         success: false,
         message: 'Please upload at least 2 PDF files to merge'
@@ -57,6 +60,7 @@ exports.mergePdfs = async (req, res) => {
 
     const mergedPdfBytes = await mergedPdf.save();
     const mergedSize = mergedPdfBytes.length;
+    Logger.logUsage(req, 'pdf_merge', true).catch(() => {});
 
     // Cleanup temp files
     req.files.forEach((file) => {

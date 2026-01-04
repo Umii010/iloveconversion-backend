@@ -2,6 +2,8 @@ const path = require('path');
 const os = require('os');
 const fs = require('fs');
 const { exec } = require('child_process');
+const Logger = require('../services/logger');
+
 
 exports.ocrPdf = (req, res) => {
   if (!req.file) {
@@ -17,16 +19,22 @@ exports.ocrPdf = (req, res) => {
   const scriptPath = path.join(__dirname, 'ocr_pdf.py');
 
   const command = `${pythonPath} "${scriptPath}" "${inputPath}" "${outputPath}"`;
+  const startTime = Date.now();
 
   exec(command, (error, stdout, stderr) => {
     if (error) {
       console.error('OCR PDF failed:', stderr || error);
+            Logger.logUsage(req, 'ocr_pdf', false).catch(() => {});
+
       return res.status(500).json({ success: false, message: 'OCR PDF conversion failed' });
     }
 
     if (!fs.existsSync(outputPath)) {
+            Logger.logUsage(req, 'ocr_pdf', false).catch(() => {});
+
       return res.status(500).json({ success: false, message: 'OCR PDF not created' });
     }
+    Logger.logUsage(req, 'ocr_pdf', true).catch(() => {});
 
     res.download(outputPath, `${originalName}_ocr.pdf`, () => {
       setTimeout(() => {

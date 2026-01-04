@@ -1,8 +1,13 @@
 const { diffLines, diffWords, diffChars } = require('diff');
+const Logger = require('../services/logger');
+const { v4: uuidv4 } = require('uuid');
+const cookieParser = require('cookie-parser');
+
 
 class CodeDiffController {
   compareCode = async (req, res) => {
     try {
+  
       const { 
         originalCode, 
         modifiedCode, 
@@ -31,12 +36,10 @@ class CodeDiffController {
           break;
       }
 
-      // Process diff result for frontend display
       const processedDiff = this.processDiffResult(diffResult, comparisonType);
-      
-      // Calculate statistics
       const stats = this.calculateDiffStats(diffResult);
 
+      Logger.logUsage(req, 'code_diff', true);
       res.json({
         success: true,
         diff: processedDiff,
@@ -46,6 +49,7 @@ class CodeDiffController {
       });
     } catch (error) {
       console.error('Code comparison error:', error);
+      Logger.logUsage(req, 'code_diff', false);
       res.status(500).json({ error: 'Internal server error' });
     }
   };

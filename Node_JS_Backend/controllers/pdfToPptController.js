@@ -3,15 +3,16 @@ const os = require('os');
 const fs = require('fs');
 const { exec } = require('child_process');
 const util = require('util');
+const Logger = require('../services/logger'); 
 
-// Convert exec to promise-based
+
 const execPromise = util.promisify(require('child_process').exec);
 
 exports.pdfToPpt = async (req, res) => {
   console.log('PDF to PPT conversion started');
   
   if (!req.file) {
-    console.log('No file uploaded');
+    Logger.logUsage(req, 'pdf_to_ppt', false).catch(() => {});
     return res.status(400).json({
       success: false,
       message: 'No PDF uploaded'
@@ -21,28 +22,16 @@ exports.pdfToPpt = async (req, res) => {
   const inputPath = req.file.path;
   const originalName = path.parse(req.file.originalname).name;
   const outputPath = path.join(os.tmpdir(), `${originalName}.pptx`);
-
-  console.log(`Input: ${inputPath}`);
-  console.log(`Output: ${outputPath}`);
-  console.log(`Original name: ${originalName}`);
-
   const pythonPath = `"C:\\Users\\Admin\\AppData\\Local\\Python\\pythoncore-3.10-64\\python.exe"`;
   const scriptPath = path.join(__dirname, 'pdf_to_ppt.py');
 
-  // Build command with error output redirection
   const command = `${pythonPath} "${scriptPath}" "${inputPath}" "${outputPath}" 2>&1`;
 
-  console.log(`Executing command: ${command}`);
-
   try {
-    // Execute Python script
     const { stdout, stderr } = await execPromise(command, { 
       maxBuffer: 10 * 1024 * 1024, // 10MB buffer
       encoding: 'utf8'
     });
-
-    console.log('Python script output:');
-    console.log(stdout);
     
     if (stderr) {
       console.error('Python script stderr:', stderr);
@@ -51,6 +40,8 @@ exports.pdfToPpt = async (req, res) => {
     // Check if output file was created
     if (!fs.existsSync(outputPath)) {
       console.error('Output file not created');
+            Logger.logUsage(req, 'pdf_to_ppt', false).catch(() => {});
+
       return res.status(500).json({
         success: false,
         message: 'PPT file not generated. Check server logs for details.'
@@ -58,15 +49,12 @@ exports.pdfToPpt = async (req, res) => {
     }
 
     const stats = fs.statSync(outputPath);
-    console.log(`PPT file created: ${outputPath} (${stats.size} bytes)`);
-
-    // Send file
+    Logger.logUsage(req, 'pdf_to_ppt', true).catch(() => {});
     res.download(outputPath, `${originalName}.pptx`, (err) => {
       if (err) {
         console.error('Download error:', err);
       }
       
-      // Clean up files after download
       setTimeout(() => {
         try { 
           fs.unlinkSync(inputPath); 
@@ -77,7 +65,6 @@ exports.pdfToPpt = async (req, res) => {
         
         try { 
           fs.unlinkSync(outputPath); 
-          console.log(`Cleaned up: ${outputPath}`);
         } catch (cleanupErr) {
           console.error('Error cleaning up output:', cleanupErr);
         }
@@ -86,8 +73,9 @@ exports.pdfToPpt = async (req, res) => {
 
   } catch (error) {
     console.error('PDF to PPT conversion failed:', error);
+        Logger.logUsage(req, 'pdf_to_ppt', false).catch(() => {});
+
     
-    // Clean up input file on error
     try { 
       fs.unlinkSync(inputPath); 
       console.log(`Cleaned up input on error: ${inputPath}`);
