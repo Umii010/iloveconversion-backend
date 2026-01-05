@@ -6,7 +6,6 @@ const curlconverter = require('curlconverter');
 const Logger = require('../services/logger');
 
 class DeveloperController {
-  // JSON to XML Converter
   jsonToXml = async (req, res) => {
     try {
       const { json } = req.body;

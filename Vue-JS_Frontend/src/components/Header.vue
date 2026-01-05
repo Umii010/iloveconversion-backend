@@ -74,9 +74,9 @@ const closeMenu = () => {
                                 </router-link>
                             </li>
                             <li>
-                                <router-link to="/video-downloader" class="submenu-item" @click="closeMenu">
+                                <router-link to="/encoding-tools" class="submenu-item" @click="closeMenu">
                                     <span class="submenu-icon">{} </span>
-                                    Video Downloader
+                                    Encoding Tools
                                 </router-link>
                             </li>
                             <li>
@@ -85,19 +85,19 @@ const closeMenu = () => {
                                     Tool Analytics
                                 </router-link>
                             </li>
-                            <li>
-                                <router-link to="/html-formatter" class="submenu-item" @click="closeMenu">
+                            <!-- <li>
+                                <router-link to="/barcode-generator" class="submenu-item">
                                     <span class="submenu-icon">🌐</span>
-                                    HTML Formatter
+                                    Barcode Generator
                                 </router-link>
-                            </li>
+                            </li> -->
                         </ul>
                     </li>
 
                     <li>
-                        <router-link to="/qr-code" class="menu-item" @click="closeMenu">
-                            <span class="icon">⭐</span>
-                            QR Code
+                        <router-link to="/barcode-generator" class="menu-item" @click="closeMenu">
+                           <span class="icon">🔍</span> 
+                                    Barcode Generator
                         </router-link>
                     </li>
                 </ul>
@@ -137,9 +137,9 @@ const closeMenu = () => {
                                 </router-link>
                             </li>
                             <li>
-                                <router-link to="/video-downloader" class="submenu-item">
+                               <router-link to="/encoding-tools" class="submenu-item" @click="closeMenu">
                                     <span class="submenu-icon">{} </span>
-                                    Video Downloader
+                                    Encoding Tools
                                 </router-link>
                             </li>
                             <li>
@@ -148,19 +148,19 @@ const closeMenu = () => {
                                     Tool Analytics
                                 </router-link>
                             </li>
-                            <li>
-                                <router-link to="/html-formatter" class="submenu-item">
+                            <!-- <li>
+                                <router-link to="/barcode-generator" class="submenu-item">
                                     <span class="submenu-icon">🌐</span>
-                                    HTML Formatter
+                                    Barcode Generator
                                 </router-link>
-                            </li>
+                            </li> -->
                         </ul>
                     </li>
 
                     <li>
-                        <router-link to="/qr-code" class="menu-item">
-                            <span class="icon">⭐</span>
-                            QR Code
+                       <router-link to="/barcode-generator" class="menu-item" @click="closeMenu">
+                           <span class="icon">🔍</span> 
+                                    Barcode Generator
                         </router-link>
                     </li>
                 </ul>

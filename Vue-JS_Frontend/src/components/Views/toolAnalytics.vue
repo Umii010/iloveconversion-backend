@@ -30,9 +30,6 @@
           <div class="last-updated">
             <i class="fas fa-sync-alt"></i>
             Last updated: {{ formatDate(lastUpdated) }}
-            <span v-if="autoRefresh" class="auto-refresh-badge">
-              <i class="fas fa-bolt"></i> Auto-refresh ON
-            </span>
           </div>
           <div class="data-range">
             <i class="fas fa-calendar-alt"></i>
@@ -44,9 +41,6 @@
       <!-- Summary Stats Cards -->
       <section class="summary-stats">
         <div class="stat-card total-usage">
-          <div class="stat-icon">
-            <i class="fas fa-tools"></i>
-          </div>
           <div class="stat-content">
             <h3>Total Tools Served</h3>
             <p class="stat-number">{{ formatNumber(dashboardStats.summary?.totalToolsServed || 0) }}</p>
@@ -58,9 +52,6 @@
         </div>
 
         <div class="stat-card avg-time">
-          <div class="stat-icon">
-            <i class="fas fa-clock"></i>
-          </div>
           <div class="stat-content">
             <h3>Average Processing Time</h3>
             <p class="stat-number">{{ dashboardStats.summary?.averageProcessingTime || '0.0' }}s</p>
@@ -72,9 +63,6 @@
         </div>
 
         <div class="stat-card success-rate">
-          <div class="stat-icon">
-            <i class="fas fa-check-circle"></i>
-          </div>
           <div class="stat-content">
             <h3>Success Rate</h3>
             <p class="stat-number">{{ parseFloat(dashboardStats.summary?.successRate || 0).toFixed(1) }}%</p>
@@ -90,9 +78,6 @@
         </div>
 
         <div class="stat-card user-growth">
-          <div class="stat-icon">
-            <i class="fas fa-users"></i>
-          </div>
           <div class="stat-content">
             <h3>User Activity</h3>
             <p class="stat-number">{{ formatNumber(dashboardStats.summary?.uniqueUsers || 0) }}</p>
@@ -154,10 +139,15 @@
               </thead>
               <tbody>
                 <tr v-for="tool in filteredTools" :key="tool.id">
-                  <td class="tool-name">
-                    <i :class="tool.icon"></i>
-                    <span>{{ tool.name }}</span>
-                  </td>
+                   <td class="tool-name">
+    <i :class="tool.icon"></i>
+    <div class="tool-name-content">
+      <span>{{ tool.name }}</span>
+      <small class="tool-original-name" v-if="tool.originalName && tool.originalName !== tool.name.toLowerCase().replace(/ /g, '_')">
+        {{ tool.originalName }}
+      </small>
+    </div>
+  </td>
                   <td>
                     <div class="metric-with-bar">
                       <span>{{ formatNumber(tool.usageCount) }}</span>
@@ -303,9 +293,6 @@
               <h4><i class="fas fa-mobile-alt"></i> Device Usage Distribution</h4>
               <div class="device-stats">
                 <div v-for="device in deviceStats" :key="device.type" class="device-stat">
-                  <div class="device-icon">
-                    <i :class="getDeviceIcon(device.type)"></i>
-                  </div>
                   <div class="device-info">
                     <div class="device-header">
                       <span class="device-label">{{ formatDeviceName(device.type) }}</span>
@@ -398,9 +385,6 @@
           <h2><i class="fas fa-history"></i> Recent Activity</h2>
           <div class="activity-list">
             <div class="activity-item" v-for="activity in recentActivity" :key="activity.id">
-              <div class="activity-icon" :class="activity.type">
-                <i :class="activity.icon"></i>
-              </div>
               <div class="activity-details">
                 <div class="activity-title">{{ activity.title }}</div>
                 <div class="activity-meta">
@@ -417,7 +401,7 @@
       </div>
     </div>
 
-    <!-- Settings Panel -->
+    <!-- Settings Panel - REMOVED AUTO-REFRESH OPTION -->
     <div v-if="showSettings" class="settings-panel">
       <div class="settings-header">
         <h3><i class="fas fa-cog"></i> Dashboard Settings</h3>
@@ -426,12 +410,7 @@
         </button>
       </div>
       <div class="settings-content">
-        <div class="setting-item">
-          <label>
-            <input type="checkbox" v-model="autoRefresh">
-            Auto-refresh every 5 minutes
-          </label>
-        </div>
+        <!-- Removed auto-refresh checkbox -->
         <div class="setting-item">
           <label>Time Format</label>
           <select v-model="timeFormat" class="setting-select">
@@ -455,13 +434,6 @@
           </select>
         </div>
       </div>
-    </div>
-
-    <!-- Floating Action Button -->
-    <div class="fab-container">
-      <button class="fab" @click="toggleSettings">
-        <i class="fas fa-cog"></i>
-      </button>
     </div>
   </div>
 </template>
@@ -491,7 +463,6 @@ export default {
     const loading = ref(true);
     const error = ref(null);
     const lastUpdated = ref(new Date());
-    const autoRefresh = ref(true);
     const showSettings = ref(false);
     const timeFormat = ref('12h');
     const numberFormat = ref('short');
@@ -505,9 +476,6 @@ export default {
     let usageChartInstance = null;
     let successChartInstance = null;
     let growthChartInstance = null;
-    
-    // Refresh interval
-    let refreshInterval = null;
     
     // Computed properties
     const sortedTools = computed(() => {
@@ -567,47 +535,45 @@ export default {
       return activities;
     });
     
-    // Methods
-    const fetchData = async () => {
-      try {
-        loading.value = true;
-        error.value = null;
-        
-        // Fetch all data in parallel
-        const [
-          dashboardResponse,
-          toolsResponse,
-          trendsResponse,
-          growthResponse,
-          deviceCountryResponse
-        ] = await Promise.all([
-          axios.get('http://192.168.18.101:3000/api/analytics/dashboard'),
-          axios.get('http://192.168.18.101:3000/api/analytics/tools/performance'),
-          axios.get(`http://192.168.18.101:3000/api/analytics/trends/usage?timeframe=${selectedTimeframe.value}`),
-          axios.get('http://192.168.18.101:3000/api/analytics/trends/users'),
-          axios.get('http://192.168.18.101:3000/api/analytics/stats/devices-countries')
-        ]);
-        
-        // Set data
-        dashboardStats.value = dashboardResponse.data.data;
-        toolsData.value = toolsResponse.data.tools;
-        usageTrends.value = trendsResponse.data.data;
-        userGrowth.value = growthResponse.data.data;
-        deviceStats.value = deviceCountryResponse.data.data.devices;
-        countryStats.value = deviceCountryResponse.data.data.countries;
-        
-        lastUpdated.value = new Date();
-        
-        // Initialize charts
-        initCharts();
-        
-      } catch (err) {
-        console.error('Error fetching analytics data:', err);
-        error.value = err.response?.data?.error || 'Failed to load analytics data. Please try again later.';
-      } finally {
-        loading.value = false;
-      }
-    };
+const fetchData = async () => {
+  try {
+    loading.value = true;
+    error.value = null;
+    
+    console.log('🔄 Fetching analytics data...');
+    
+    // Make all necessary API calls in parallel
+    const [dashboardResponse, toolsResponse, trendsResponse, growthResponse, deviceCountryResponse] = await Promise.all([
+      axios.get('http://192.168.18.101:3000/api/analytics/dashboard'),
+      axios.get('http://192.168.18.101:3000/api/analytics/tools/performance'),
+      axios.get(`http://192.168.18.101:3000/api/analytics/trends/usage?timeframe=${selectedTimeframe.value}`),
+      axios.get('http://192.168.18.101:3000/api/analytics/trends/users'),
+      axios.get('http://192.168.18.101:3000/api/analytics/stats/devices-countries')
+    ]);
+    
+    // Set all data
+    dashboardStats.value = dashboardResponse.data.data;
+    toolsData.value = toolsResponse.data.tools || [];
+    usageTrends.value = trendsResponse.data.data;
+    userGrowth.value = growthResponse.data.data;
+    
+    // IMPORTANT: Extract device and country stats from deviceCountryResponse
+    if (deviceCountryResponse.data.data) {
+      deviceStats.value = deviceCountryResponse.data.data.devices || [];
+      countryStats.value = deviceCountryResponse.data.data.countries || [];
+    }
+    
+    lastUpdated.value = new Date();
+    initCharts();
+    console.log('✅ Analytics data fetched successfully');
+    
+  } catch (err) {
+    console.error('❌ Error fetching analytics data:', err);
+    error.value = err.response?.data?.error || 'Failed to load analytics data.';
+  } finally {
+    loading.value = false;
+  }
+};
     
     const initCharts = () => {
       // Destroy existing charts
@@ -894,12 +860,12 @@ export default {
     
     const getPeakHours = () => {
       if (!dashboardStats.value.hourlyUsage || dashboardStats.value.hourlyUsage.length === 0) {
-        return '2:00 PM - 4:00 PM';
+        return timeFormat.value === '12h' ? '2:00 PM - 4:00 PM' : '14:00 - 16:00';
       }
       
       const hourly = dashboardStats.value.hourlyUsage;
       let maxCount = 0;
-      let peakHour = 14; // Default to 2 PM
+      let peakHour = 14;
       
       for (let i = 0; i < hourly.length; i++) {
         if (hourly[i] > maxCount) {
@@ -908,9 +874,18 @@ export default {
         }
       }
       
+      const formatHour = (hour) => {
+        if (timeFormat.value === '12h') {
+          const period = hour >= 12 ? 'PM' : 'AM';
+          const displayHour = hour % 12 || 12;
+          return `${displayHour}:00 ${period}`;
+        }
+        return `${hour}:00`;
+      };
+      
       const startHour = peakHour;
-      const endHour = peakHour + 2;
-      return `${startHour}:00 - ${endHour}:00`;
+      const endHour = (peakHour + 2) % 24;
+      return `${formatHour(startHour)} - ${formatHour(endHour)}`;
     };
     
     const getBusiestDay = () => {
@@ -968,30 +943,17 @@ export default {
       showSettings.value = !showSettings.value;
     };
     
-    const setupAutoRefresh = () => {
-      if (autoRefresh.value && !refreshInterval) {
-        refreshInterval = setInterval(fetchData, 5 * 60 * 1000); // 5 minutes
-      } else if (!autoRefresh.value && refreshInterval) {
-        clearInterval(refreshInterval);
-        refreshInterval = null;
-      }
-    };
-    
     // Lifecycle
     onMounted(() => {
       fetchData();
-      setupAutoRefresh();
       
       onUnmounted(() => {
-        if (refreshInterval) clearInterval(refreshInterval);
+        // Clean up chart instances
         [usageChartInstance, successChartInstance, growthChartInstance].forEach(chart => {
           if (chart) chart.destroy();
         });
       });
     });
-    
-    // Watchers
-    watch(autoRefresh, setupAutoRefresh);
     
     return {
       // Data
@@ -1012,7 +974,6 @@ export default {
       loading,
       error,
       lastUpdated,
-      autoRefresh,
       showSettings,
       timeFormat,
       numberFormat,
@@ -1053,7 +1014,6 @@ export default {
   }
 };
 </script>
-
 <style scoped>
 .analytics-dashboard {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -1144,11 +1104,10 @@ export default {
 }
 
 .dashboard-header h1 {
-  font-size: 2.5rem;
-  font-weight: 500;
+  font-size: 2rem;
+  font-weight: 400;
   margin-bottom: 10px;
   color: #f8fafc;
-  display: flex;
   align-items: center;
   gap: 15px;
 }
@@ -1270,7 +1229,7 @@ export default {
 
 .stat-content h3 {
   font-size: 0.9rem;
-  color: #94a3b8;
+  color: white;
   margin-bottom: 8px;
   font-weight: 300;
   text-transform: uppercase;
@@ -1719,7 +1678,6 @@ export default {
   font-size: 1.1rem;
   font-weight: 400;
   margin-bottom: 25px;
-  display: flex;
   align-items: center;
   gap: 12px;
   color: #f8fafc;
@@ -1729,7 +1687,6 @@ export default {
   color: #3b82f6;
 }
 
-/* Devices View */
 .device-stats {
   display: flex;
   flex-direction: column;
@@ -1771,7 +1728,7 @@ export default {
 
 .device-percent {
   font-weight: 400;
-  color: #3b82f6;
+  color: white;
 }
 
 .device-bar {
@@ -1794,7 +1751,6 @@ export default {
   color: #94a3b8;
 }
 
-/* Countries View */
 .countries-list {
   display: flex;
   flex-direction: column;
@@ -1895,8 +1851,8 @@ export default {
 
 .peak-value {
   font-size: 1.5rem;
-  font-weight: 500;
-  color: #3b82f6;
+  font-weight: 300;
+  color: white;
   margin-bottom: 10px;
 }
 
@@ -1947,9 +1903,22 @@ export default {
   transition: all 0.3s;
 }
 
+.tool-name-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.tool-original-name {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  margin-top: 2px;
+  font-family: monospace;
+  opacity: 0.7;
+}
+
 .view-btn.active {
-  background: #3b82f6;
-  color: white;
+  background: white;
+  color: black;
 }
 
 .view-btn:hover:not(.active) {
@@ -1960,7 +1929,7 @@ export default {
 /* Recent Activity */
 .recent-activity h2 {
   font-size: 1.5rem;
-  font-weight: 400;
+  font-weight: 300;
   margin-bottom: 20px;
   display: flex;
   align-items: center;
@@ -2139,35 +2108,6 @@ export default {
 
 .setting-item input[type="checkbox"] {
   margin-right: 10px;
-}
-
-/* Floating Action Button */
-.fab-container {
-  position: fixed;
-  bottom: 30px;
-  right: 30px;
-  z-index: 999;
-}
-
-.fab {
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
-  border: none;
-  color: white;
-  font-size: 1.5rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 10px 25px rgba(59, 130, 246, 0.3);
-  transition: all 0.3s ease;
-}
-
-.fab:hover {
-  transform: scale(1.1);
-  box-shadow: 0 15px 30px rgba(59, 130, 246, 0.4);
 }
 
 /* Responsive Design */

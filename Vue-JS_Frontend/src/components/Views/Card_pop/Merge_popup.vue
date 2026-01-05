@@ -354,7 +354,7 @@ const handleDrop = (e) => {
 
 /* File Summary */
 .file-summary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: black;
   color: white;
   padding: 16px 20px;
   border-radius: 12px;
@@ -372,7 +372,7 @@ const handleDrop = (e) => {
 .summary-header h3 {
   margin: 0;
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 300;
 }
 
 .clear-all-btn {
@@ -407,7 +407,6 @@ const handleDrop = (e) => {
   align-items: center;
 }
 
-/* Upload Box */
 .upload-box {
   display: block;
   border: 2px dashed #aaa;
@@ -422,7 +421,6 @@ const handleDrop = (e) => {
 .upload-box:hover, .upload-box.drag-over {
   border-color: #667eea;
   background: #f0f4ff;
-  transform: translateY(-2px);
   box-shadow: 0 8px 25px rgba(102, 126, 234, 0.1);
 }
 
@@ -529,23 +527,20 @@ const handleDrop = (e) => {
 
 /* Merge Button */
 .merge-btn {
-  width: 100%;
   padding: 16px;
   font-size: 16px;
   border-radius: 10px;
   border: none;
   cursor: pointer;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: black;
   color: white;
-  font-weight: 600;
+  font-weight: 400;
   transition: all 0.3s ease;
-  margin-top: 10px;
   position: relative;
   overflow: hidden;
 }
 
 .merge-btn:hover:not(:disabled):not(.disabled) {
-  transform: translateY(-2px);
   box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
 }
 
@@ -672,7 +667,7 @@ const handleDrop = (e) => {
 }
 
 .popup-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: black;
   color: white;
   padding: 20px;
   display: flex;
@@ -757,7 +752,7 @@ const handleDrop = (e) => {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: black;
   color: white;
 }
 
@@ -766,7 +761,7 @@ const handleDrop = (e) => {
 }
 
 .btn-secondary {
-  background: #6c757d;
+  background: black;
   color: white;
 }
 

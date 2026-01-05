@@ -6,6 +6,8 @@ import DeveloperToolsPage from '@/components/Views/DeveloperToolsPage.vue';
 import CodeDiffTool from '@/components/Views/CodeDiffTool.vue';
 import VideoDownloader from '@/components/Views/VideoDownloader.vue';
 import toolAnalytics from '@/components/Views/toolAnalytics.vue';
+import Barcode from '@/components/Views/BarcodeGenerator.vue';
+import EncodingTools from '@/components/Views/EncodingTools.vue';
 
 const router = createRouter({
 	history: createWebHistory(),
@@ -13,6 +15,14 @@ const router = createRouter({
 		{
 			path: '/',
 			component: Home
+		},
+		{
+			path: '/encoding-tools',
+			component: EncodingTools
+		},
+		{
+			path: '/barcode-generator',
+			component: Barcode
 		},
 		{
 			path:'/tool-analytics',

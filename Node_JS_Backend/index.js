@@ -4,8 +4,8 @@ const morgan = require('morgan');
 const pool = require("./db");
 const cookieParser = require('cookie-parser');
 const userTracker = require('./middleware/userTracker');
-
-
+const barcodeRoutes = require('./routes/barcodeRoutes');
+const encoderRoutes = require('./routes/encoderRoutes');
 
 const app = express();
 
@@ -26,8 +26,18 @@ app.use('/api', userRoutes);
 app.use('/api/developer', developerRoutes);
 app.use('/api/code-diff', codeDiffRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/barcode', barcodeRoutes);
+app.use('/api/encoder', encoderRoutes);
 
 
+
+
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/analytics')) {
+    return next();
+  }
+    next();
+});
 
 const PORT = process.env.PORT || 3000;
 
