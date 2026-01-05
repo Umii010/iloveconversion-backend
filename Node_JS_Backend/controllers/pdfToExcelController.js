@@ -3,14 +3,17 @@ const os = require('os');
 const fs = require('fs');
 const { exec } = require('child_process');
 const util = require('util');
+const Logger = require('../services/logger');
 
-// Convert exec to promise-based for better error handling
+
 const execPromise = util.promisify(require('child_process').exec);
 
 exports.pdfToExcel = async (req, res) => {
   console.log('📊 PDF to Excel conversion started...');
   
   if (!req.file) {
+        Logger.logUsage(req, 'pdf_to_excel', false).catch(() => {});
+
     return res.status(400).json({ 
       success: false, 
       message: 'No PDF uploaded' 
@@ -21,40 +24,31 @@ exports.pdfToExcel = async (req, res) => {
   const originalName = path.parse(req.file.originalname).name;
   const outputPath = path.join(os.tmpdir(), `${originalName}.xlsx`);
 
-  console.log(`📄 Input: ${inputPath}`);
-  console.log(`📄 Output: ${outputPath}`);
-  console.log(`📄 Original: ${originalName}`);
-
   const pythonPath = `"C:\\Users\\Admin\\AppData\\Local\\Python\\pythoncore-3.10-64\\python.exe"`;
   const scriptPath = path.join(__dirname, 'pdf_to_excel.py');
 
   const command = `${pythonPath} "${scriptPath}" "${inputPath}" "${outputPath}" 2>&1`;
 
-  console.log(`⚡ Executing: ${command}`);
 
   try {
-    // Start timing
     const startTime = Date.now();
     
-    // Execute Python script
     const { stdout, stderr } = await execPromise(command, {
-      maxBuffer: 10 * 1024 * 1024, // 10MB buffer
+      maxBuffer: 10 * 1024 * 1024, 
       encoding: 'utf8',
-      timeout: 180000 // 3 minutes timeout
+      timeout: 180000 
     });
 
     const processingTime = ((Date.now() - startTime) / 1000).toFixed(1);
     
-    console.log(`⏱️ Processing time: ${processingTime}s`);
-    console.log('📋 Python output:', stdout);
-    
     if (stderr) {
-      console.error('⚠️ Python warnings:', stderr);
+      console.error('Python warnings:', stderr);
     }
 
-    // Check if output file exists
     if (!fs.existsSync(outputPath)) {
-      console.error('❌ Output file not created');
+      console.error('Output file not created');
+            Logger.logUsage(req, 'pdf_to_excel', false).catch(() => {});
+
       try { fs.unlinkSync(inputPath); } catch {}
       
       return res.status(500).json({
@@ -67,11 +61,8 @@ exports.pdfToExcel = async (req, res) => {
     // Get file stats
     const stats = fs.statSync(outputPath);
     const fileSizeMB = (stats.size / (1024 * 1024)).toFixed(2);
-    
-    console.log(`✅ Excel created! Size: ${fileSizeMB} MB`);
-    console.log(`⏱️ Total time: ${processingTime}s`);
+        Logger.logUsage(req, 'pdf_to_excel', true).catch(() => {});
 
-    // Send file with proper headers
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${originalName}.xlsx"`);
     res.setHeader('X-Processing-Time', `${processingTime}s`);
@@ -85,31 +76,28 @@ exports.pdfToExcel = async (req, res) => {
       setTimeout(() => {
         try { 
           fs.unlinkSync(inputPath); 
-          console.log(`🧹 Cleaned input: ${inputPath}`);
         } catch {}
         try { 
           fs.unlinkSync(outputPath); 
-          console.log(`🧹 Cleaned output: ${outputPath}`);
         } catch {}
       }, 3000);
     });
     
     fileStream.on('error', (err) => {
-      console.error('❌ Stream error:', err);
+      console.error('Stream error:', err);
       try { fs.unlinkSync(inputPath); } catch {}
       try { fs.unlinkSync(outputPath); } catch {}
     });
 
   } catch (error) {
-    console.error('❌ PDF to Excel conversion failed:', error);
-    
-    // Cleanup on error
-    try { 
+    console.error(' PDF to Excel conversion failed:', error);
+        Logger.logUsage(req, 'pdf_to_excel', false).catch(() => {});
+
+        try { 
       fs.unlinkSync(inputPath); 
       console.log(`🧹 Cleaned input on error: ${inputPath}`);
     } catch {}
     
-    // Provide helpful error message
     let errorMessage = 'PDF to Excel conversion failed';
     
     if (error.code === 'ENOENT') {

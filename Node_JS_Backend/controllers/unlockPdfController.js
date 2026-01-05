@@ -3,22 +3,29 @@ const path = require('path');
 const os = require('os');
 const { exec } = require('child_process');
 const archiver = require('archiver');
+const Logger = require('../services/logger');
+
 
 const QPDF_PATH = `"C:\\Program Files\\qpdf\\bin\\qpdf.exe"`; 
 
 exports.unlockPdf = async (req, res) => {
   try {
     if (!req.files || !req.files.length) {
+            Logger.logUsage(req, 'pdf_unlock', false).catch(() => {});
+
       return res.status(400).json({ success: false, message: 'No PDF files uploaded' });
     }
 
     const password = req.body.password;
     if (!password) {
+            Logger.logUsage(req, 'pdf_unlock', false).catch(() => {});
+
       return res.status(400).json({ success: false, message: 'PDF password is required' });
     }
 
     const tempDir = os.tmpdir();
     const outputFiles = [];
+    const startTime = Date.now();
 
     for (const file of req.files) {
       const inputPath = file.path;
@@ -39,6 +46,8 @@ exports.unlockPdf = async (req, res) => {
         outputFiles.push(outputPath);
       } catch (err) {
         console.error(`Failed to unlock ${file.originalname}`, err);
+                Logger.logUsage(req, 'pdf_unlock', false).catch(() => {});
+
         return res.status(400).json({
           success: false,
           message: `Invalid password or corrupted file: ${file.originalname}`
@@ -47,6 +56,8 @@ exports.unlockPdf = async (req, res) => {
         try { fs.unlinkSync(inputPath); } catch {}
       }
     }
+        Logger.logUsage(req, 'pdf_unlock', true).catch(() => {});
+
 
     if (outputFiles.length === 1) {
       return res.download(outputFiles[0], path.basename(outputFiles[0]), () => {
@@ -73,6 +84,8 @@ exports.unlockPdf = async (req, res) => {
 
   } catch (err) {
     console.error('Unlock PDF error:', err);
+        Logger.logUsage(req, 'pdf_unlock', false).catch(() => {});
+
     res.status(500).json({ success: false, message: 'Failed to unlock PDF' });
   }
 };

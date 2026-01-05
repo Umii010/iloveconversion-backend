@@ -5,6 +5,7 @@ import DeveloperTools from '@/components/Views/DeveloperToolsPage.vue'
 import DeveloperToolsPage from '@/components/Views/DeveloperToolsPage.vue';
 import CodeDiffTool from '@/components/Views/CodeDiffTool.vue';
 import VideoDownloader from '@/components/Views/VideoDownloader.vue';
+import toolAnalytics from '@/components/Views/toolAnalytics.vue';
 
 const router = createRouter({
 	history: createWebHistory(),
@@ -12,6 +13,10 @@ const router = createRouter({
 		{
 			path: '/',
 			component: Home
+		},
+		{
+			path:'/tool-analytics',
+			component:toolAnalytics
 		},
 		{
 			path: '/video-downloader',
@@ -22,7 +27,7 @@ const router = createRouter({
 			component: CodeDiffTool
 		},
 		{
-			path:'/features',
+			path:'/qr-code',
 			component: Features
 		},
 		{

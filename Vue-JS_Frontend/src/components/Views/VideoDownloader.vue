@@ -1535,6 +1535,7 @@ onUnmounted(() => {
   .step-content h3,
   .feature-card h3 {
     color: gray;
+    font-weight: normal;
   }
   
   .page-subtitle,
@@ -1615,6 +1616,7 @@ onUnmounted(() => {
 @media (max-width: 768px) {
   .page-title {
     font-size: 2rem;
+    font-weight: normal;
   }
   
   .page-content,

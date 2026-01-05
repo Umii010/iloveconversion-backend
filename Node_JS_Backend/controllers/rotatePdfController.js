@@ -2,20 +2,26 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { PDFDocument, degrees } = require('pdf-lib');
+const Logger = require('../services/logger');
+
 
 exports.rotatePdf = async (req, res) => {
   try {
     if (!req.files || !req.files.length) {
+            Logger.logUsage(req, 'pdf_rotate', false).catch(() => {});
       return res.status(400).json({ success: false, message: 'No PDF files uploaded' });
     }
 
     const angle = parseInt(req.body.angle || 90, 10);
     if (![90, 180, 270].includes(angle)) {
+            Logger.logUsage(req, 'pdf_rotate', false).catch(() => {});
+
       return res.status(400).json({ success: false, message: 'Invalid rotation angle' });
     }
 
     const tempDir = os.tmpdir();
     const outputFiles = [];
+    const startTime = Date.now();
 
     for (const file of req.files) {
       const inputPath = file.path;
@@ -36,6 +42,7 @@ exports.rotatePdf = async (req, res) => {
 
       try { fs.unlinkSync(inputPath); } catch {}
     }
+    Logger.logUsage(req, 'pdf_rotate', true).catch(() => {});
 
     if (outputFiles.length === 1) {
       return res.download(outputFiles[0], path.basename(outputFiles[0]), () => {
@@ -63,6 +70,7 @@ exports.rotatePdf = async (req, res) => {
 
   } catch (err) {
     console.error('Rotate PDF error:', err);
+        Logger.logUsage(req, 'pdf_rotate', false).catch(() => {});
     res.status(500).json({ success: false, message: 'PDF rotation failed' });
   }
 };

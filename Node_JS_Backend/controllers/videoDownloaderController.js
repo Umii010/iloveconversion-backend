@@ -1,14 +1,14 @@
 const { exec, spawn } = require('child_process');
 const axios = require('axios');
 const archiver = require('archiver');
+const Logger = require('../services/logger'); 
 
-// ✅ Full path to yt-dlp installed via Winget
+
 const YTDLP_PATH = 'C:\\Users\\Admin\\AppData\\Local\\Microsoft\\WinGet\\Packages\\yt-dlp.yt-dlp_Microsoft.Winget.Source_8wekyb3d8bbwe\\yt-dlp.exe';
 
 class VideoDownloaderController {
 
     constructor() {
-        // 🔐 Bind ALL methods that use `this`
         this.getVideoInfo = this.getVideoInfo.bind(this);
         this.downloadVideo = this.downloadVideo.bind(this);
         this.downloadAllFormats = this.downloadAllFormats.bind(this);
@@ -20,19 +20,16 @@ class VideoDownloaderController {
         this.getTikTokInfo = this.getTikTokInfo.bind(this);
         this.getTwitterInfo = this.getTwitterInfo.bind(this);
         this.getGenericVideoInfo = this.getGenericVideoInfo.bind(this);
-
         this.downloadYouTubeVideo = this.downloadYouTubeVideo.bind(this);
         this.downloadInstagramVideo = this.downloadInstagramVideo.bind(this);
         this.downloadFacebookVideo = this.downloadFacebookVideo.bind(this);
         this.downloadTikTokVideo = this.downloadTikTokVideo.bind(this);
         this.downloadTwitterVideo = this.downloadTwitterVideo.bind(this);
         this.downloadGenericVideo = this.downloadGenericVideo.bind(this);
-
         this.formatBytes = this.formatBytes.bind(this);
         this.getExtensionFromContentType = this.getExtensionFromContentType.bind(this);
         this.filterQualityFormats = this.filterQualityFormats.bind(this);
         
-        // Active processes tracking
         this.activeProcesses = new Map();
     }
 
@@ -44,14 +41,13 @@ class VideoDownloaderController {
         try {
             const { url, platform } = req.body;
             if (!url) {
+            Logger.logUsage(req, 'video_info', false).catch(() => {});
+
                 return res.status(400).json({ success: false, error: 'Video URL is required' });
             }
 
             const detectedPlatform = platform || this.detectPlatform(url);
             let videoInfo;
-
-            console.log(`Fetching info for ${detectedPlatform} URL: ${url}`);
-
             switch (detectedPlatform.toLowerCase()) {
                 case 'youtube':
                     videoInfo = await this.getYouTubeInfo(url);
@@ -72,7 +68,7 @@ class VideoDownloaderController {
                     videoInfo = await this.getGenericVideoInfo(url);
             }
 
-            console.log(`Successfully fetched info for: ${videoInfo.title}`);
+                        Logger.logUsage(req, 'video_info', true).catch(() => {});
 
             return res.json({
                 success: true,
@@ -81,7 +77,8 @@ class VideoDownloaderController {
 
         } catch (err) {
             console.error('Error in getVideoInfo:', err.message);
-            
+                        Logger.logUsage(req, 'video_info', false).catch(() => {});
+
             // Special handling for private/restricted videos
             if (err.message.includes('private') || err.message.includes('restricted') || 
                 err.message.includes('unavailable') || err.message.includes('login')) {
@@ -106,11 +103,14 @@ class VideoDownloaderController {
         try {
             const { url, quality, format, platform, formatId } = req.body;
             if (!url) {
+                                Logger.logUsage(req, 'video_download', false).catch(() => {});
+
                 return res.status(400).json({ success: false, error: 'Video URL is required' });
             }
 
             const detectedPlatform = platform || this.detectPlatform(url);
             console.log(`Downloading from ${detectedPlatform}: ${url}, quality: ${quality}, formatId: ${formatId}`);
+            req.startTime = Date.now();
 
             switch (detectedPlatform.toLowerCase()) {
                 case 'youtube':
@@ -129,6 +129,8 @@ class VideoDownloaderController {
 
         } catch (err) {
             console.error('Error in downloadVideo:', err);
+                        Logger.logUsage(req, 'video_download', false).catch(() => {});
+
             res.status(500).json({ success: false, error: err.message });
         }
     }
@@ -137,10 +139,13 @@ class VideoDownloaderController {
         try {
             const { url } = req.body;
             if (!url) {
+                                Logger.logUsage(req, 'video_download_all', false).catch(() => {});
+
                 return res.status(400).json({ success: false, error: 'Video URL is required' });
             }
 
             const videoInfo = await this.getYouTubeInfo(url);
+            Logger.logUsage(req, 'video_download_all', true).catch(() => {});
 
             res.setHeader('Content-Type', 'application/zip');
             res.setHeader('Content-Disposition', 'attachment; filename="video_formats.zip"');
@@ -156,6 +161,8 @@ class VideoDownloaderController {
             await archive.finalize();
         } catch (err) {
             console.error(err);
+                        Logger.logUsage(req, 'video_download_all', false).catch(() => {});
+
             res.status(500).json({ success: false, error: err.message });
         }
     }
@@ -622,6 +629,7 @@ class VideoDownloaderController {
                 // Store process for potential cleanup
                 const processId = Date.now();
                 this.activeProcesses.set(processId, ytProcess);
+                Logger.logUsage(req, 'video_download_youtube', true).catch(() => {});
 
                 ytProcess.stdout.pipe(res);
 
@@ -633,6 +641,8 @@ class VideoDownloaderController {
                 ytProcess.on('error', err => {
                     console.error('yt-dlp spawn error:', err);
                     this.activeProcesses.delete(processId);
+                                        Logger.logUsage(req, 'video_download_youtube', false).catch(() => {});
+
                     if (!res.headersSent) {
                         res.status(500).json({ success: false, error: 'Download failed to start' });
                     }
@@ -644,6 +654,8 @@ class VideoDownloaderController {
                     console.log(`yt-dlp process closed with code ${code}`);
                     
                     if (code !== 0 && !res.headersSent) {
+                                                Logger.logUsage(req, 'video_download_youtube', false).catch(() => {});
+
                         res.status(500).json({ success: false, error: `Download failed with code ${code}` });
                     }
                     resolve();
@@ -658,7 +670,10 @@ class VideoDownloaderController {
                 });
 
             } catch (err) {
+                
                 console.error('Error in downloadYouTubeVideo:', err);
+                                Logger.logUsage(req, 'video_download_youtube', false).catch(() => {});
+
                 if (!res.headersSent) {
                     res.status(500).json({ success: false, error: err.message });
                 }
@@ -694,6 +709,7 @@ class VideoDownloaderController {
             ];
             
             const igProcess = spawn(YTDLP_PATH, args, { shell: true });
+            Logger.logUsage(req, 'video_download_instagram', true).catch(() => {});
 
             igProcess.stdout.pipe(res);
 
@@ -703,6 +719,8 @@ class VideoDownloaderController {
 
             igProcess.on('error', err => {
                 console.error('Instagram download error:', err);
+                                Logger.logUsage(req, 'video_download_instagram', false).catch(() => {});
+
                 if (!res.headersSent) {
                     res.status(500).json({ success: false, error: 'Instagram download failed' });
                 }
@@ -710,6 +728,8 @@ class VideoDownloaderController {
 
         } catch (err) {
             console.error(err);
+                        Logger.logUsage(req, 'video_download_instagram', false).catch(() => {});
+
             res.status(500).json({ success: false, error: err.message });
         }
     }

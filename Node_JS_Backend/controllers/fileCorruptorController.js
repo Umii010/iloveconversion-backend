@@ -1,12 +1,14 @@
 const fs = require('fs').promises;
 const path = require('path');
 const crypto = require('crypto');
+const Logger = require('../services/logger');
 
 class FileCorruptorController {
   handleCorruptFile = async (req, res) => {
     
     try {
       if (!req.file) {
+        Logger.logUsage(req, 'file_corruptor', false).catch(() => {});
         return res.status(400).json({ error: 'No file provided' });
       }
 
@@ -50,11 +52,13 @@ class FileCorruptorController {
       res.setHeader('X-Original-Size', originalBuffer.length);
       res.setHeader('X-Corrupted-Size', corruptedBuffer.length);
       res.setHeader('X-Warning', 'FILE IS COMPLETELY UNUSABLE - DO NOT ATTEMPT TO OPEN');
+      Logger.logUsage(req, 'file_corruptor', true).catch(() => {});
       await fs.unlink(filePath).catch(() => {});
       res.send(corruptedBuffer);
 
     } catch (error) {
       console.error('Corruption error:', error);
+      Logger.logUsage(req, 'file_corruptor', false).catch(() => {});
       res.status(500).json({ 
         error: 'Failed to destroy file',
         message: error.message 

@@ -4,6 +4,7 @@ const fs = require('fs');
 const { exec } = require('child_process');
 const util = require('util');
 const archiver = require('archiver');
+const Logger = require('../services/logger'); 
 
 const execPromise = util.promisify(exec);
 
@@ -13,6 +14,7 @@ exports.pdfToPng = async (req, res) => {
   
   try {
     if (!req.file) {
+      Logger.logUsage(req, 'pdf_to_png', false).catch(() => {});
       return res.status(400).json({
         success: false,
         message: 'No PDF uploaded'
@@ -23,9 +25,6 @@ exports.pdfToPng = async (req, res) => {
     const originalName = path.parse(req.file.originalname).name;
     const originalSize = req.file.size;
     const tempDir = os.tmpdir();
-
-    console.log(`Processing PDF to PNG: ${req.file.originalname} (${originalSize} bytes)`);
-
     const timestamp = Date.now();
     const outputPattern = path.join(tempDir, `${originalName}_${timestamp}_%03d.png`);
 
@@ -34,8 +33,6 @@ exports.pdfToPng = async (req, res) => {
       : 'gs';
 
     const command = `${gsPath} -dSAFER -dBATCH -dNOPAUSE -sDEVICE=png16m -r150 -dTextAlphaBits=4 -dGraphicsAlphaBits=4 -dUseCIEColor -sOutputFile="${outputPattern}" "${inputPath}"`;
-
-    console.log('Executing GhostScript command...');
     
     const { stdout, stderr } = await execPromise(command, { 
       timeout: 180000, 
@@ -55,10 +52,10 @@ exports.pdfToPng = async (req, res) => {
     outputFiles = pngFiles;
 
     if (!pngFiles.length) {
+            Logger.logUsage(req, 'pdf_to_png', false).catch(() => {});
+
       throw new Error('No PNG files generated');
     }
-
-    console.log(`Generated ${pngFiles.length} PNG file(s)`);
 
     let totalSize = 0;
     pngFiles.forEach(file => {
@@ -67,6 +64,8 @@ exports.pdfToPng = async (req, res) => {
 
     const pageCount = pngFiles.length;
     const isMultiPage = pageCount > 1;
+        Logger.logUsage(req, 'pdf_to_png', true).catch(() => {});
+
 
     res.set({
       'X-Original-Filename': req.file.originalname,
@@ -133,10 +132,11 @@ exports.pdfToPng = async (req, res) => {
       await archive.finalize();
     }
 
-    console.log(`Conversion successful: ${pageCount} page(s), ${formatBytes(totalSize)} total`);
 
   } catch (error) {
     console.error('PDF to PNG conversion error:', error);
+        Logger.logUsage(req, 'pdf_to_png', false).catch(() => {});
+
     
     if (inputPath && fs.existsSync(inputPath)) {
       fs.unlinkSync(inputPath);

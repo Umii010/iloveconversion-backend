@@ -3,6 +3,7 @@ const yaml = require('js-yaml');
 const { parse } = require('csv-parse/sync');
 const { stringify } = require('csv-stringify/sync');
 const curlconverter = require('curlconverter');
+const Logger = require('../services/logger');
 
 class DeveloperController {
   // JSON to XML Converter
@@ -28,7 +29,8 @@ class DeveloperController {
       });
 
       const xml = builder.buildObject(parsedJson);
-      
+      Logger.logUsage(req, 'json_to_xml', true).catch(() => {});
+
       res.json({
         success: true,
         xml: xml,
@@ -36,6 +38,7 @@ class DeveloperController {
       });
     } catch (error) {
       console.error('JSON to XML error:', error);
+          Logger.logUsage(req, 'json_to_xml', false).catch(() => {});
       res.status(500).json({ error: 'Internal server error' });
     }
   };

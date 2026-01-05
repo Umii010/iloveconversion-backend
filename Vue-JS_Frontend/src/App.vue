@@ -38,7 +38,7 @@ import Footer from './components/Footer.vue'
 
 .content {
   flex: 1;
-  padding: 16px;
+  padding: 8px;
   overflow-y: auto;
 }
 

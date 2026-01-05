@@ -36,9 +36,7 @@ Organize PDF</button>
     </div>
 </template>
 <style scoped>
-.home {
-    margin-inline: 10px;
-}  
+ 
 .home-title {
     text-align: center;
     margin-top: 50px;
@@ -85,7 +83,8 @@ Organize PDF</button>
 @media (max-width: 1024px){
     .home-title__title{
         font-size: 28px;
-        line-height: 40px;
+        line-height: 30px;
+        margin-bottom: 20px;
     }
     .home-title__subtitle {
         font-size: 16px;

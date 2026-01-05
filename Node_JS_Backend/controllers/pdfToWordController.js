@@ -2,10 +2,14 @@ const path = require('path');
 const os = require('os');
 const fs = require('fs');
 const { exec } = require('child_process');
-const pdf = require('pdf-parse'); // Install: npm install pdf-parse
+const pdf = require('pdf-parse');
+const Logger = require('../services/logger');
+
 
 exports.pdfToWord = async (req, res) => {
   if (!req.file) {
+        Logger.logUsage(req, 'pdf_to_word', false).catch(() => {});
+
     return res.status(400).json({ success: false, message: 'No PDF uploaded' });
   }
 
@@ -31,6 +35,7 @@ exports.pdfToWord = async (req, res) => {
   const command = `${pythonPath} "${scriptPath}" "${inputPath}" "${outputPath}"`;
 
   console.log(`Starting PDF to Word conversion: ${originalName}`);
+  const startTime = Date.now();
 
   exec(command, (error, stdout, stderr) => {
     // Clean up input file
@@ -38,11 +43,15 @@ exports.pdfToWord = async (req, res) => {
 
     if (error) {
       console.error('PDF to Word conversion failed:', stderr || error);
+            Logger.logUsage(req, 'pdf_to_word', false).catch(() => {});
+
       return res.status(500).json({ success: false, message: 'Conversion failed: ' + (stderr || error.message) });
     }
 
     if (!fs.existsSync(outputPath)) {
       console.error('Converted DOCX not found:', outputPath);
+            Logger.logUsage(req, 'pdf_to_word', false).catch(() => {});
+
       return res.status(500).json({ success: false, message: 'Converted file not found' });
     }
 
@@ -55,6 +64,7 @@ exports.pdfToWord = async (req, res) => {
     }
 
     console.log(`Conversion successful: ${originalSize} bytes → ${convertedSize} bytes`);
+    Logger.logUsage(req, 'pdf_to_word', true).catch(() => {});
 
     // Set response headers with stats
     res.setHeader('X-Original-Size', originalSize);

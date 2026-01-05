@@ -80,9 +80,9 @@ const closeMenu = () => {
                                 </router-link>
                             </li>
                             <li>
-                                <router-link to="/base64-encoder" class="submenu-item" @click="closeMenu">
+                                <router-link to="/tool-analytics" class="submenu-item" @click="closeMenu">
                                     <span class="submenu-icon">🔤</span>
-                                    Base64 Encoder
+                                    Tool Analytics
                                 </router-link>
                             </li>
                             <li>
@@ -143,9 +143,9 @@ const closeMenu = () => {
                                 </router-link>
                             </li>
                             <li>
-                                <router-link to="/base64-encoder" class="submenu-item">
+                                  <router-link to="/tool-analytics" class="submenu-item" @click="closeMenu">
                                     <span class="submenu-icon">🔤</span>
-                                    Base64 Encoder
+                                    Tool Analytics
                                 </router-link>
                             </li>
                             <li>

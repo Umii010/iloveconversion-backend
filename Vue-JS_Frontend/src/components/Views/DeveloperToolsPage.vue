@@ -1494,6 +1494,9 @@ onMounted(() => {
   .converter-grid {
     grid-template-columns: 1fr;
   }
+  .tool-categories{
+    flex-wrap: wrap;
+  }
 }
 
 /* Converter Card */
@@ -2136,12 +2139,10 @@ onMounted(() => {
 
 /* Responsive Design */
 @media (max-width: 768px) {
-  .header-content {
-    flex-direction: column;
-    text-align: center;
-    gap: 16px;
+
+  .header-content{
+    align-items: flex-start;
   }
-  
   .page-title {
     font-size: 1.5rem;
   }
