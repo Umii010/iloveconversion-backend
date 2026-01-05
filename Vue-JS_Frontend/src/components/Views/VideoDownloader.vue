@@ -155,78 +155,105 @@
           </div>
         </div>
 
-        <!-- Quality Options - ONLY 2 FORMATS -->
-        <div class="quality-section" v-if="videoInfo.formats && videoInfo.formats.length > 0">
-          <h3 class="section-title">Download Options</h3>
-          <p class="section-subtitle">Select your preferred quality to download:</p>
-          
-          <div class="quality-grid" :class="{'two-formats': videoInfo.formats.length === 2}">
-            <div 
-              v-for="(format, index) in videoInfo.formats.slice(0, 2)" 
-              :key="format.formatId || format.quality"
-              class="quality-card"
-              :class="{ 
-                'selected': selectedFormat === format.formatId,
-                'best-quality': index === 0,
-                'good-quality': index === 1
-              }"
-              @click="selectFormat(format.formatId)"
-            >
-              <div class="quality-header">
-                <div class="quality-type">
-                  <span class="quality-badge" :class="format.type">{{ format.type.toUpperCase() }}</span>
-                  <span class="quality-label">{{ format.quality }}</span>
-                  <span v-if="index === 0" class="recommended-badge">Recommended</span>
-                </div>
-                <div class="quality-size">{{ format.size }}</div>
-              </div>
-              
-              <div class="quality-details">
-                <div class="detail-item">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-9 9H3V5h9v7z"/>
-                  </svg>
-                  <span>{{ format.resolution || 'N/A' }}</span>
-                </div>
-                
-                <div class="detail-item" v-if="format.fps && format.fps !== 'N/A' && selectedPlatform === 'youtube'">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
-                  </svg>
-                  <span>{{ format.fps }} fps</span>
-                </div>
-
-                <div class="detail-item" v-if="format.bitrate && format.bitrate !== 'N/A' && selectedPlatform === 'youtube'">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-8 12H9v-2h2v2zm0-4H9V7h2v4zm4 4h-2v-2h2v2zm0-4h-2V7h2v4z"/>
-                  </svg>
-                  <span>{{ format.bitrate }}</span>
-                </div>
-              </div>
-              
-              <button 
-                class="download-quality-btn"
-                :class="{ 'best-btn': index === 0, 'good-btn': index === 1 }"
-                @click.stop="downloadVideo(format)"
-                :disabled="downloading"
-              >
-                <span v-if="downloading && selectedFormat === format.formatId" class="loading-spinner small"></span>
-                <span v-else>
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
-                  </svg>
-                  {{ index === 0 ? 'Download Best' : 'Download Good' }}
-                </span>
-              </button>
-            </div>
-          </div>
-          
-          <!-- Note about limited formats -->
-          <div class="formats-note" v-if="videoInfo.formats.length === 1">
-            <span>Only one quality option is available for this video.</span>
-          </div>
+      <!-- Quality Options - Only show if formats available -->
+<div class="quality-section" v-if="videoInfo.formats && videoInfo.formats.length > 0">
+  <h3 class="section-title">Download Options</h3>
+  <p class="section-subtitle" v-if="selectedPlatform === 'youtube'">Select your preferred quality:</p>
+  <p class="section-subtitle" v-else>Available download option:</p>
+  
+  <div class="quality-grid" :class="{'two-formats': videoInfo.formats.length === 2, 'one-format': videoInfo.formats.length === 1}">
+    <div 
+      v-for="(format, index) in videoInfo.formats" 
+      :key="format.formatId || format.quality"
+      class="quality-card"
+      :class="{ 
+        'selected': selectedFormat === format.formatId,
+        'best-quality': index === 0,
+        'good-quality': index === 1
+      }"
+      @click="selectFormat(format.formatId)"
+    >
+      <div class="quality-header">
+        <div class="quality-type">
+          <span class="quality-badge" :class="format.type">{{ format.type.toUpperCase() }}</span>
+          <span class="quality-label">{{ format.quality }}</span>
+          <span v-if="index === 0 && videoInfo.formats.length > 1" class="recommended-badge">Recommended</span>
+        </div>
+        <div class="quality-size">{{ format.size }}</div>
+      </div>
+      
+      <div class="quality-details">
+        <div class="detail-item">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-9 9H3V5h9v7z"/>
+          </svg>
+          <span>{{ format.resolution || 'Standard' }}</span>
+        </div>
+        
+        <div class="detail-item" v-if="format.fps && format.fps !== 'N/A' && selectedPlatform === 'youtube'">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
+          </svg>
+          <span>{{ format.fps }} fps</span>
         </div>
 
+        <div class="detail-item" v-if="format.bitrate && format.bitrate !== 'N/A' && selectedPlatform === 'youtube'">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-8 12H9v-2h2v2zm0-4H9V7h2v4zm4 4h-2v-2h2v2zm0-4h-2V7h2v4z"/>
+          </svg>
+          <span>{{ format.bitrate }}</span>
+        </div>
+      </div>
+      
+      <button 
+        class="download-quality-btn"
+        :class="{ 'best-btn': index === 0, 'good-btn': index === 1 }"
+        @click.stop="downloadVideo(format)"
+        :disabled="downloading"
+      >
+        <span v-if="downloading && selectedFormat === format.formatId" class="loading-spinner small"></span>
+        <span v-else>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+          </svg>
+          {{ selectedPlatform === 'youtube' && videoInfo.formats.length > 1 ? 
+             (index === 0 ? 'Download Standard' : 'Download Good') : 
+             'Download Video' }}
+        </span>
+      </button>
+    </div>
+  </div>
+  
+  <!-- Quality tip for YouTube -->
+  <div class="quality-tip" v-if="selectedPlatform === 'youtube'">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+    </svg>
+    <span>Tip: "Standard" quality provides best compatibility and file size.</span>
+  </div>
+</div>
+
+<!-- No Download Available Message -->
+<div v-else-if="videoInfo && !privateVideoError" class="no-download-section">
+  <div class="no-download-content">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+    </svg>
+    <div>
+      <h4>Download Not Available</h4>
+      <p>{{ videoInfo.note || 'This video cannot be downloaded. Try a YouTube video for best results.' }}</p>
+      <p class="suggestion">Try these instead:</p>
+      <div class="suggested-links">
+        <button class="suggested-link" @click="loadExample('https://www.youtube.com/watch?v=dQw4w9WgXcQ')">
+          YouTube Example 1
+        </button>
+        <button class="suggested-link" @click="loadExample('https://www.youtube.com/watch?v=jNQXAC9IVRw')">
+          YouTube Example 2
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
         <!-- Platform-specific note -->
         <div class="platform-note" v-if="selectedPlatform !== 'youtube' && videoInfo">
           <div class="note-content">
@@ -663,7 +690,7 @@ const downloadVideo = async (format) => {
 
     updateProgress('Downloading Video', 'Download complete!', 100)
     setTimeout(() => {
-      success.value = '✓ Download completed successfully'
+      success.value = 'Download completed successfully'
       hideProgress()
     }, 1000)
 
@@ -814,6 +841,111 @@ onUnmounted(() => {
   margin: 0;
 }
 
+/* No Download Section */
+.no-download-section {
+  margin: 20px 0;
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.no-download-content {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.no-download-content svg {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  color: #d97706;
+}
+
+.no-download-content h4 {
+  margin: 0 0 8px 0;
+  color: #92400e;
+  font-size: 1.1rem;
+}
+
+.no-download-content p {
+  margin: 0 0 12px 0;
+  color: #92400e;
+  line-height: 1.5;
+}
+
+.suggestion {
+  font-weight: 600;
+  margin-top: 16px !important;
+}
+
+.suggested-links {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.suggested-link {
+  padding: 8px 16px;
+  background: #fbbf24;
+  border: none;
+  border-radius: 8px;
+  color: #92400e;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.suggested-link:hover {
+  background: #f59e0b;
+  transform: translateY(-2px);
+}
+
+/* Quality Tip */
+.quality-tip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #dbeafe;
+  border: 1px solid #93c5fd;
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 16px;
+  color: #1e40af;
+  font-size: 0.9rem;
+}
+
+.quality-tip svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  color: #3b82f6;
+}
+
+/* Quality Grid Adjustments */
+.quality-grid.one-format {
+  grid-template-columns: 1fr;
+  max-width: 400px;
+  margin: 0 auto 24px;
+}
+
+.quality-grid.two-formats {
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+@media (max-width: 768px) {
+  .quality-grid.two-formats {
+    grid-template-columns: 1fr;
+  }
+  
+  .quality-grid.one-format {
+    max-width: 100%;
+  }
+}
 /* Platform Icons */
 .platform-icons {
   display: flex;

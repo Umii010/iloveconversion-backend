@@ -176,32 +176,73 @@ class VideoDownloaderController {
 
     filterQualityFormats(formats, platform) {
         if (platform === 'youtube') {
-            // For YouTube, filter to only show popular quality options
-            const qualityOrder = ['2160p', '1440p', '1080p', '720p', '480p', '360p', '240p', '144p'];
+            // For YouTube, filter to show only standard quality formats (avoid HDR/HD)
             const seenResolutions = new Set();
             const filteredFormats = [];
             
-            // Sort by resolution (highest first)
+            // Sort by resolution (medium first, avoid too high)
             formats.sort((a, b) => {
                 const aRes = parseInt(a.resolution) || 0;
                 const bRes = parseInt(b.resolution) || 0;
-                return bRes - aRes;
+                // Prefer 720p, 480p, 360p over 1080p, 1440p, 2160p
+                const aScore = aRes <= 720 ? aRes + 1000 : aRes; // Boost lower resolutions
+                const bScore = bRes <= 720 ? bRes + 1000 : bRes;
+                return bScore - aScore;
             });
             
-            // Take only 6-8 best formats
+            // Take only 2 best standard formats (avoid HDR)
             for (const format of formats) {
                 const resolution = format.resolution;
-                if (!seenResolutions.has(resolution) && filteredFormats.length < 8) {
-                    seenResolutions.add(resolution);
-                    filteredFormats.push(format);
+                const quality = format.quality.toLowerCase();
+                
+                // Skip HDR formats (too high contrast/quality issues)
+                if (quality.includes('hdr') || quality.includes('dolby')) {
+                    continue;
                 }
+                
+                // Skip 4K/1440p if we have lower options
+                const resNum = parseInt(resolution) || 0;
+                if (resNum > 1080 && filteredFormats.length >= 1) {
+                    continue;
+                }
+                
+                if (!seenResolutions.has(resolution) && filteredFormats.length < 2) {
+                    seenResolutions.add(resolution);
+                    
+                    // Rename quality labels for better understanding
+                    let qualityLabel = format.quality;
+                    if (resNum <= 480) {
+                        qualityLabel = 'Standard';
+                    } else if (resNum <= 720) {
+                        qualityLabel = 'Good';
+                    } else if (resNum <= 1080) {
+                        qualityLabel = 'HD';
+                    }
+                    
+                    filteredFormats.push({
+                        ...format,
+                        quality: qualityLabel,
+                        originalQuality: format.quality // Keep original for download
+                    });
+                }
+            }
+            
+            // If no formats found, return at least one
+            if (filteredFormats.length === 0 && formats.length > 0) {
+                return [formats[0]];
             }
             
             return filteredFormats;
         }
         
-        // For other platforms, just return top 3 formats
-        return formats.slice(0, 3);
+        // For other platforms, return empty array if only "Unknown" is available
+        const validFormats = formats.filter(f => 
+            f.size !== 'Unknown' && 
+            f.quality !== 'Unknown' && 
+            f.quality !== 'Best Available'
+        );
+        
+        return validFormats.length > 0 ? validFormats.slice(0, 1) : [];
     }
 
     async getYouTubeInfo(url) {
@@ -234,9 +275,17 @@ class VideoDownloaderController {
                     return reject(new Error('Invalid response from video service'));
                 }
 
-                // Get all video formats
+                // Get all video formats (avoid HDR formats)
                 const allFormats = (data.formats || [])
-                    .filter(f => f.ext === 'mp4' && f.vcodec !== 'none')
+                    .filter(f => {
+                        // Filter for standard MP4 videos (not HDR)
+                        const isMP4 = f.ext === 'mp4';
+                        const hasVideo = f.vcodec !== 'none';
+                        const quality = (f.format_note || '').toLowerCase();
+                        const isNotHDR = !quality.includes('hdr') && !quality.includes('dolby');
+                        
+                        return isMP4 && hasVideo && isNotHDR;
+                    })
                     .map(f => ({
                         quality: f.format_note || `${f.height || 'N/A'}p`,
                         type: 'video',
@@ -247,10 +296,11 @@ class VideoDownloaderController {
                         bitrate: f.tbr ? `${Math.round(f.tbr)} kbps` : 'N/A',
                         formatId: f.format_id,
                         hasAudio: f.acodec !== 'none',
-                        hasVideo: f.vcodec !== 'none'
+                        hasVideo: f.vcodec !== 'none',
+                        originalFormatId: f.format_id
                     }));
 
-                // Filter to show only popular quality options
+                // Filter to show only standard quality options
                 const formats = this.filterQualityFormats(allFormats, 'youtube');
 
                 resolve({
@@ -282,7 +332,7 @@ class VideoDownloaderController {
                         return reject(new Error('This Instagram content is private or requires login'));
                     }
                     
-                    // For Instagram, we'll show basic info even if we can't get details
+                    // For Instagram, return empty formats array (no download available)
                     return resolve({
                         title: 'Instagram Video',
                         thumbnail: '',
@@ -290,55 +340,52 @@ class VideoDownloaderController {
                         author: '',
                         views: 0,
                         description: '',
-                        formats: [{
-                            quality: 'Best Available',
-                            type: 'video',
-                            size: 'Unknown',
-                            resolution: 'N/A',
-                            formatId: 'best',
-                            hasAudio: true,
-                            hasVideo: true
-                        }],
+                        formats: [], // Empty array = no download available
                         url: url,
-                        note: 'Instagram videos may have limited information available'
+                        note: 'Download not available for this Instagram video. Try a different URL.'
                     });
                 }
 
                 try {
                     const data = JSON.parse(stdout);
-                    const formats = [];
-
-                    // Add best format
-                    if (data.format_id || data.url) {
-                        formats.push({
-                            quality: 'Best Available',
+                    
+                    // Only return format if we have actual data
+                    if (data.filesize || data.url) {
+                        const formats = [{
+                            quality: 'Available',
                             type: 'video',
-                            size: data.filesize ? this.formatBytes(data.filesize) : 'Unknown',
-                            resolution: data.height ? `${data.height}p` : 'N/A',
+                            size: data.filesize ? this.formatBytes(data.filesize) : 'Standard',
+                            resolution: data.height ? `${data.height}p` : 'Standard',
                             formatId: 'best',
                             hasAudio: true,
-                            hasVideo: true
+                            hasVideo: true,
+                            originalFormatId: 'best'
+                        }];
+
+                        return resolve({
+                            title: data.title || 'Instagram Video',
+                            thumbnail: data.thumbnail || data.thumbnails?.[0]?.url,
+                            duration: data.duration,
+                            author: data.uploader || data.creator,
+                            views: data.view_count,
+                            description: data.description?.slice(0, 200) || '',
+                            formats,
+                            url: url
+                        });
+                    } else {
+                        // No valid format data
+                        return resolve({
+                            title: 'Instagram Video',
+                            thumbnail: '',
+                            duration: 0,
+                            author: '',
+                            views: 0,
+                            description: '',
+                            formats: [],
+                            url: url,
+                            note: 'Download not available for this Instagram video.'
                         });
                     }
-
-                    resolve({
-                        title: data.title || 'Instagram Video',
-                        thumbnail: data.thumbnail || data.thumbnails?.[0]?.url,
-                        duration: data.duration,
-                        author: data.uploader || data.creator,
-                        views: data.view_count,
-                        description: data.description?.slice(0, 200) || '',
-                        formats: formats.length > 0 ? formats : [{
-                            quality: 'Best Available',
-                            type: 'video',
-                            size: 'Unknown',
-                            resolution: 'N/A',
-                            formatId: 'best',
-                            hasAudio: true,
-                            hasVideo: true
-                        }],
-                        url: url
-                    });
                 } catch (e) {
                     console.error('Instagram JSON parse error:', e);
                     resolve({
@@ -348,17 +395,9 @@ class VideoDownloaderController {
                         author: '',
                         views: 0,
                         description: '',
-                        formats: [{
-                            quality: 'Best Available',
-                            type: 'video',
-                            size: 'Unknown',
-                            resolution: 'N/A',
-                            formatId: 'best',
-                            hasAudio: true,
-                            hasVideo: true
-                        }],
+                        formats: [],
                         url: url,
-                        note: 'Limited information available'
+                        note: 'Download not available for this Instagram video.'
                     });
                 }
             });
@@ -379,7 +418,7 @@ class VideoDownloaderController {
                         return reject(new Error('This Facebook video is private or requires login'));
                     }
                     
-                    // Basic info for Facebook
+                    // Return empty formats for Facebook
                     return resolve({
                         title: 'Facebook Video',
                         thumbnail: '',
@@ -387,42 +426,50 @@ class VideoDownloaderController {
                         author: '',
                         views: 0,
                         description: '',
-                        formats: [{
-                            quality: 'Best Available',
-                            type: 'video',
-                            size: 'Unknown',
-                            resolution: 'N/A',
-                            formatId: 'best',
-                            hasAudio: true,
-                            hasVideo: true
-                        }],
+                        formats: [],
                         url: url,
-                        note: 'Facebook videos may have download restrictions'
+                        note: 'Facebook download requires login and may have restrictions.'
                     });
                 }
 
                 try {
                     const data = JSON.parse(stdout);
-                    const formats = [{
-                        quality: 'Best Available',
-                        type: 'video',
-                        size: data.filesize ? this.formatBytes(data.filesize) : 'Unknown',
-                        resolution: data.height ? `${data.height}p` : 'N/A',
-                        formatId: 'best',
-                        hasAudio: true,
-                        hasVideo: true
-                    }];
+                    
+                    if (data.filesize || data.url) {
+                        const formats = [{
+                            quality: 'Available',
+                            type: 'video',
+                            size: data.filesize ? this.formatBytes(data.filesize) : 'Standard',
+                            resolution: data.height ? `${data.height}p` : 'Standard',
+                            formatId: 'best',
+                            hasAudio: true,
+                            hasVideo: true,
+                            originalFormatId: 'best'
+                        }];
 
-                    resolve({
-                        title: data.title || 'Facebook Video',
-                        thumbnail: data.thumbnail,
-                        duration: data.duration,
-                        author: data.uploader,
-                        views: data.view_count,
-                        description: data.description?.slice(0, 200) || '',
-                        formats,
-                        url: url
-                    });
+                        return resolve({
+                            title: data.title || 'Facebook Video',
+                            thumbnail: data.thumbnail,
+                            duration: data.duration,
+                            author: data.uploader,
+                            views: data.view_count,
+                            description: data.description?.slice(0, 200) || '',
+                            formats,
+                            url: url
+                        });
+                    } else {
+                        return resolve({
+                            title: 'Facebook Video',
+                            thumbnail: '',
+                            duration: 0,
+                            author: '',
+                            views: 0,
+                            description: '',
+                            formats: [],
+                            url: url,
+                            note: 'Download not available for this Facebook video.'
+                        });
+                    }
                 } catch (e) {
                     console.error('Facebook JSON parse error:', e);
                     resolve({
@@ -432,17 +479,9 @@ class VideoDownloaderController {
                         author: '',
                         views: 0,
                         description: '',
-                        formats: [{
-                            quality: 'Best Available',
-                            type: 'video',
-                            size: 'Unknown',
-                            resolution: 'N/A',
-                            formatId: 'best',
-                            hasAudio: true,
-                            hasVideo: true
-                        }],
+                        formats: [],
                         url: url,
-                        note: 'Limited information available'
+                        note: 'Download not available for this Facebook video.'
                     });
                 }
             });
@@ -468,42 +507,50 @@ class VideoDownloaderController {
                         author: '',
                         views: 0,
                         description: '',
-                        formats: [{
-                            quality: 'Best Available',
-                            type: 'video',
-                            size: 'Unknown',
-                            resolution: 'N/A',
-                            formatId: 'best',
-                            hasAudio: true,
-                            hasVideo: true
-                        }],
+                        formats: [],
                         url: url,
-                        note: 'TikTok videos may have limited information'
+                        note: 'TikTok download may require special handling.'
                     });
                 }
 
                 try {
                     const data = JSON.parse(stdout);
-                    const formats = [{
-                        quality: 'Best Available',
-                        type: 'video',
-                        size: data.filesize ? this.formatBytes(data.filesize) : 'Unknown',
-                        resolution: data.height ? `${data.height}p` : 'N/A',
-                        formatId: 'best',
-                        hasAudio: true,
-                        hasVideo: true
-                    }];
+                    
+                    if (data.filesize || data.url) {
+                        const formats = [{
+                            quality: 'Available',
+                            type: 'video',
+                            size: data.filesize ? this.formatBytes(data.filesize) : 'Standard',
+                            resolution: data.height ? `${data.height}p` : 'Standard',
+                            formatId: 'best',
+                            hasAudio: true,
+                            hasVideo: true,
+                            originalFormatId: 'best'
+                        }];
 
-                    resolve({
-                        title: data.title || 'TikTok Video',
-                        thumbnail: data.thumbnail,
-                        duration: data.duration,
-                        author: data.uploader,
-                        views: data.view_count,
-                        description: data.description?.slice(0, 200) || '',
-                        formats,
-                        url: url
-                    });
+                        return resolve({
+                            title: data.title || 'TikTok Video',
+                            thumbnail: data.thumbnail,
+                            duration: data.duration,
+                            author: data.uploader,
+                            views: data.view_count,
+                            description: data.description?.slice(0, 200) || '',
+                            formats,
+                            url: url
+                        });
+                    } else {
+                        return resolve({
+                            title: 'TikTok Video',
+                            thumbnail: '',
+                            duration: 0,
+                            author: '',
+                            views: 0,
+                            description: '',
+                            formats: [],
+                            url: url,
+                            note: 'Download not available for this TikTok video.'
+                        });
+                    }
                 } catch (e) {
                     console.error('TikTok JSON parse error:', e);
                     resolve({
@@ -513,17 +560,9 @@ class VideoDownloaderController {
                         author: '',
                         views: 0,
                         description: '',
-                        formats: [{
-                            quality: 'Best Available',
-                            type: 'video',
-                            size: 'Unknown',
-                            resolution: 'N/A',
-                            formatId: 'best',
-                            hasAudio: true,
-                            hasVideo: true
-                        }],
+                        formats: [],
                         url: url,
-                        note: 'Limited information available'
+                        note: 'Download not available for this TikTok video.'
                     });
                 }
             });
@@ -542,17 +581,9 @@ class VideoDownloaderController {
             author: '',
             views: 0,
             description: '',
-            formats: [{
-                quality: 'Best Available',
-                type: 'video',
-                size: 'Unknown',
-                resolution: 'N/A',
-                formatId: 'best',
-                hasAudio: true,
-                hasVideo: true
-            }],
+            formats: [],
             url: url,
-            note: 'Generic video - limited information available'
+            note: 'Download not available for this video URL.'
         };
     }
 
@@ -560,9 +591,13 @@ class VideoDownloaderController {
         return new Promise((resolve, reject) => {
             try {
                 const filename = `youtube_video_${Date.now()}.mp4`;
-                let formatSpecifier = 'bestvideo[height<=1080]+bestaudio/best[height<=1080]';
                 
-                // Use formatId if provided
+                // Use standard quality format (avoid HDR)
+                // bv*[vcodec^=avc1] - Best video with standard H.264 codec
+                // ba - Best audio
+                let formatSpecifier = 'bv*[vcodec^=avc1][height<=720]+ba/b[height<=720]';
+                
+                // If specific formatId provided, use it
                 if (formatId && formatId !== 'best') {
                     formatSpecifier = formatId;
                 }
@@ -571,7 +606,15 @@ class VideoDownloaderController {
                 res.setHeader('Content-Type', 'video/mp4');
                 res.setHeader('Transfer-Encoding', 'chunked');
 
-                const args = ['-f', formatSpecifier, '-o', '-', '--no-warnings', url];
+                const args = [
+                    '-f', formatSpecifier,
+                    '--merge-output-format', 'mp4',
+                    '--no-warnings',
+                    '--no-playlist',
+                    '-o', '-',
+                    url
+                ];
+                
                 console.log('Running yt-dlp with args:', args);
 
                 const ytProcess = spawn(YTDLP_PATH, args, { shell: true });
@@ -626,13 +669,30 @@ class VideoDownloaderController {
 
     async downloadInstagramVideo(url, res) {
         try {
+            // Check if download is actually possible
+            const info = await this.getInstagramInfo(url);
+            
+            if (!info.formats || info.formats.length === 0) {
+                return res.status(400).json({ 
+                    success: false, 
+                    error: 'Download not available for this Instagram video. Try a different URL.' 
+                });
+            }
+
             const filename = `instagram_video_${Date.now()}.mp4`;
             
             res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
             res.setHeader('Content-Type', 'video/mp4');
             res.setHeader('Transfer-Encoding', 'chunked');
 
-            const args = ['-f', 'best', '-o', '-', '--no-warnings', url];
+            const args = [
+                '-f', 'best',
+                '--no-warnings',
+                '--no-playlist',
+                '-o', '-',
+                url
+            ];
+            
             const igProcess = spawn(YTDLP_PATH, args, { shell: true });
 
             igProcess.stdout.pipe(res);
@@ -655,46 +715,19 @@ class VideoDownloaderController {
     }
 
     async downloadFacebookVideo(_, res) {
-        res.json({ success: true, message: 'Facebook download requires additional setup' });
+        res.json({ success: false, error: 'Facebook download not available. Try using YouTube or other platforms.' });
     }
 
     async downloadTikTokVideo(_, res) {
-        res.json({ success: true, message: 'TikTok download requires additional setup' });
+        res.json({ success: false, error: 'TikTok download not available. Try using YouTube or other platforms.' });
     }
 
     async downloadTwitterVideo(_, res) {
-        res.json({ success: true, message: 'Twitter download requires additional setup' });
+        res.json({ success: false, error: 'Twitter download not available. Try using YouTube or other platforms.' });
     }
 
     async downloadGenericVideo(url, res) {
-        try {
-            const response = await axios({
-                url,
-                method: 'GET',
-                responseType: 'stream',
-                timeout: 30000
-            });
-
-            const contentType = response.headers['content-type'] || 'video/mp4';
-            const extension = this.getExtensionFromContentType(contentType);
-            const filename = `video_${Date.now()}${extension}`;
-
-            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-            res.setHeader('Content-Type', contentType);
-
-            response.data.pipe(res);
-
-            response.data.on('error', err => {
-                console.error('Stream error:', err);
-                if (!res.headersSent) {
-                    res.status(500).json({ success: false, error: 'Download failed' });
-                }
-            });
-
-        } catch (err) {
-            console.error('Generic download error:', err);
-            res.status(500).json({ success: false, error: 'Failed to download video' });
-        }
+        res.json({ success: false, error: 'Download not available for this video URL. Try YouTube for better support.' });
     }
 
     formatBytes(bytes) {
