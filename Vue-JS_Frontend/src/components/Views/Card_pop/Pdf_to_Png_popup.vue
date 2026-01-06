@@ -311,36 +311,39 @@ const closePopup = () => {
 .converter {
   max-width: 500px;
   margin: 0 auto;
-  padding: 10px;
+  padding: 20px;
 }
 
 .converter h2 {
   font-size: 24px;
-  margin: 0;
+  margin-bottom: 8px;
   color: #2c3e50;
 }
 
 .subtitle {
   font-size: 14px;
   color: #666;
+  margin-bottom: 25px;
 }
 
+/* File Info Card */
 .file-info-card {
-  background: #ee6c4d;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border-radius: 12px;
-  padding: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
 }
 
 .file-header {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 12px;
   margin-bottom: 12px;
 }
 
 .file-icon {
-  font-size: 20px;
+  font-size: 24px;
 }
 
 .file-details {
@@ -351,6 +354,7 @@ const closePopup = () => {
 .file-details strong {
   display: block;
   font-size: 14px;
+  margin-bottom: 2px;
 }
 
 .file-details small {
@@ -380,6 +384,7 @@ const closePopup = () => {
   display: flex;
   gap: 20px;
   font-size: 13px;
+  padding-top: 10px;
   border-top: 1px solid rgba(255, 255, 255, 0.2);
 }
 
@@ -392,15 +397,17 @@ const closePopup = () => {
   opacity: 0.9;
 }
 
+/* Upload Box */
 .upload-box {
   display: block;
   text-align: center;
   border: 2px dashed #aaa;
   border-radius: 12px;
-  padding: 10px 5px;
+  padding: 20px 10px;
   cursor: pointer;
   background: #f9f9f9;
   transition: all 0.3s ease;
+  margin-bottom: 20px;
 }
 
 .upload-box:hover {
@@ -426,6 +433,7 @@ const closePopup = () => {
 }
 
 .conversion-info {
+  margin-top: 10px;
   padding: 8px;
   background: #f8f9fa;
   border-radius: 6px;
@@ -433,17 +441,24 @@ const closePopup = () => {
   color: #666;
 }
 
+/* Convert Button */
 .convert-btn {
   width: 100%;
-  padding: 10px;
+  padding: 16px;
   font-size: 16px;
   border-radius: 10px;
   border: none;
   cursor: pointer;
-  background: #ee6c4d;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
+  font-weight: 600;
   transition: all 0.3s ease;
-  margin-top: 5px;
+  margin-top: 10px;
+}
+
+.convert-btn:hover:not(:disabled):not(.disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
 }
 
 .convert-btn:disabled, .convert-btn.disabled {
@@ -474,8 +489,8 @@ const closePopup = () => {
 
 /* Progress Section */
 .progress-section {
-  margin-top: 10px;
-  padding: 7px;
+  margin-top: 30px;
+  padding: 20px;
   background: #f8f9fa;
   border-radius: 12px;
   border: 1px solid #e9ecef;
@@ -509,7 +524,7 @@ const closePopup = () => {
 
 .progress-bar {
   height: 100%;
-  background: green;
+  background: linear-gradient(90deg, #667eea, #764ba2);
   transition: width 0.3s ease;
   position: relative;
 }
@@ -526,9 +541,10 @@ const closePopup = () => {
 }
 
 .status-text {
-     font-size: 14px;
-    color: #495057;
-    margin: 3px;
+  margin-top: 12px;
+  font-size: 14px;
+  color: #495057;
+  min-height: 20px;
 }
 
 .progress-stats {
@@ -685,15 +701,15 @@ const closePopup = () => {
 
 .stat-label {
   font-size: 12px;
-  color: white;
+  color: #666;
   margin-bottom: 8px;
   font-weight: 500;
 }
 
 .stat-value {
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 700;
-  color: white;
+  color: #2c3e50;
 }
 
 .download-info {

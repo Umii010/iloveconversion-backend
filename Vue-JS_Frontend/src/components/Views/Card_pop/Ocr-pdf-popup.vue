@@ -250,6 +250,7 @@ OCR technology continues to improve with advancements in machine learning and ar
         hidden
       />
       <div class="upload-content">
+        <span class="icon">🔍</span>
         <p><strong>Click to upload</strong> a PDF or image file</p>
         <small>Supports: PDF, JPG, PNG, TIFF, BMP</small>
         <small class="file-info">{{ file ? file.name : 'No file selected' }}</small>
@@ -291,7 +292,7 @@ OCR technology continues to improve with advancements in machine learning and ar
         :disabled="loading || !file"
       >
         <span v-if="loading">🔄 Processing OCR...</span>
-        <span v-else>Perform OCR</span>
+        <span v-else>🚀 Perform OCR</span>
       </button>
     </div>
 
@@ -313,14 +314,14 @@ OCR technology continues to improve with advancements in machine learning and ar
 
 .converter h2 {
   font-size: 24px;
-  margin: 0;
+  margin-bottom: 8px;
   color: #333;
 }
 
 .subtitle {
   font-size: 14px;
   color: #666;
-  margin-bottom: 5px;
+  margin-bottom: 25px;
   line-height: 1.5;
 }
 
@@ -329,12 +330,11 @@ OCR technology continues to improve with advancements in machine learning and ar
   display: block;
   border: 2px dashed #aaa;
   border-radius: 12px;
-  padding: 10px 5px;
+  padding: 20px 10px;
   cursor: pointer;
   background: #f9f9f9;
   transition: all 0.3s ease;
-  max-width: 576px;
-  margin-inline: auto;
+  margin-bottom: 25px;
 }
 
 .upload-box:hover {
@@ -583,26 +583,29 @@ OCR technology continues to improve with advancements in machine learning and ar
 
 /* Action Buttons */
 .action-buttons {
+  display: flex;
   gap: 15px;
   justify-content: center;
-  margin: 10px 0;
+  margin: 30px 0;
 }
 
 .ocr-btn {
   flex: 1;
-  max-width: 594px;
-  padding: 10px 13px;
-  font-size: 13px;
+  max-width: 300px;
+  padding: 16px 30px;
+  font-size: 16px;
   border-radius: 10px;
   border: none;
   cursor: pointer;
   background: linear-gradient(135deg, #4a6fa5, #3a5a8c);
   color: white;
+  font-weight: 600;
   transition: all 0.3s ease;
   box-shadow: 0 4px 12px rgba(74, 111, 165, 0.2);
 }
 
 .ocr-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(74, 111, 165, 0.3);
   background: linear-gradient(135deg, #3a5a8c, #2a4a7c);
 }
@@ -614,7 +617,7 @@ OCR technology continues to improve with advancements in machine learning and ar
 }
 
 .secondary-btn {
-  padding: 10px 13px;
+  padding: 16px 25px;
   background: white;
   border: 1px solid #ddd;
   border-radius: 10px;
@@ -622,7 +625,6 @@ OCR technology continues to improve with advancements in machine learning and ar
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
-  margin-right: 20px;
 }
 
 .secondary-btn:hover {
@@ -650,7 +652,7 @@ OCR technology continues to improve with advancements in machine learning and ar
 
 .progress-bar {
   height: 100%;
-  background: green;
+  background: linear-gradient(90deg, #4a6fa5, #6a8fc5);
   transition: width 0.3s ease;
 }
 

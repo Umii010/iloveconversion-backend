@@ -234,7 +234,7 @@ const clearFile = () => {
         hidden
       />
       <div class="upload-content">
-        <p style="margin: 0;"><strong>Click to upload</strong> a PDF file</p>
+        <p><strong>Click to upload</strong> a PDF file</p>
         <div class="file-details">
           <small class="file-info">{{ file ? file.name : 'No file selected' }}</small>
           <small v-if="fileSize" class="file-size">Size: {{ fileSize }}</small>
@@ -266,6 +266,57 @@ const clearFile = () => {
         </template>
       </button>
     </div>
+
+    <!-- Progress Section -->
+    <div v-if="loading" class="progress-section">
+      <div class="progress-header">
+        <span class="status">{{ statusText }}</span>
+        <span class="percentage">{{ progress.toFixed(0) }}%</span>
+      </div>
+      
+      <div class="progress-container">
+        <div class="progress-bar">
+          <div 
+            class="progress-fill" 
+            :style="{ width: progress + '%' }"
+          >
+            <span class="progress-text">{{ progress.toFixed(0) }}%</span>
+          </div>
+        </div>
+        
+        <div class="progress-labels">
+          <span>Upload</span>
+          <span>Analyze</span>
+          <span>Extract</span>
+          <span>Format</span>
+          <span>Complete</span>
+        </div>
+      </div>
+      
+      <div class="progress-stages">
+        <div class="stage" :class="{ active: progress >= 10 }">
+          <div class="stage-dot"></div>
+          <span class="stage-label">Upload</span>
+        </div>
+        <div class="stage" :class="{ active: progress >= 30 }">
+          <div class="stage-dot"></div>
+          <span class="stage-label">Analyze</span>
+        </div>
+        <div class="stage" :class="{ active: progress >= 50 }">
+          <div class="stage-dot"></div>
+          <span class="stage-label">Extract</span>
+        </div>
+        <div class="stage" :class="{ active: progress >= 75 }">
+          <div class="stage-dot"></div>
+          <span class="stage-label">Format</span>
+        </div>
+        <div class="stage" :class="{ active: progress >= 95 }">
+          <div class="stage-dot"></div>
+          <span class="stage-label">Download</span>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
 
@@ -274,7 +325,7 @@ const clearFile = () => {
   text-align: center;
   max-width: 800px;
   margin: 0 auto;
-  padding: 15px 10px;
+  padding: 30px 20px;
 }
 
 h2 {
@@ -284,21 +335,19 @@ h2 {
   background: linear-gradient(135deg, #217346, #2e8b57);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  margin: 0;
 }
 
 .subtitle {
   font-size: 16px;
   color: #666;
   line-height: 1.5;
-  margin: 0;
 }
 
 .upload-box {
   display: block;
   border: 3px dashed #aaa;
   border-radius: 16px;
-  padding: 10px 5px;
+  padding: 20px 10px;
   cursor: pointer;
   background: #f9f9f9;
   transition: all 0.3s ease;
@@ -348,13 +397,13 @@ h2 {
   display: flex;
   gap: 20px;
   justify-content: center;
-  margin: 10px 0;
+  margin: 40px 0;
 }
 
 .convert-btn {
   flex: 1;
   max-width: 350px;
-  padding: 10px 15px;
+  padding: 20px 30px;
   background: linear-gradient(135deg, #217346, #2e8b57);
   color: white;
   border: none;
@@ -368,10 +417,11 @@ h2 {
   align-items: center;
   justify-content: center;
   gap: 12px;
-  min-height: 40px;
+  min-height: 60px;
 }
 
 .convert-btn:hover:not(:disabled) {
+  transform: translateY(-3px);
   box-shadow: 0 12px 30px rgba(33, 115, 70, 0.4);
   background: linear-gradient(135deg, #2e8b57, #217346);
 }
@@ -387,13 +437,15 @@ h2 {
 }
 
 .secondary-btn {
-  padding: 5px 10px;
+  padding: 20px 30px;
   background: white;
   border: 2px solid #d1d5db;
   border-radius: 14px;
   color: #6b7280;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
+  min-width: 140px;
   font-size: 16px;
 }
 

@@ -341,7 +341,7 @@ const closeStats = () => {
         </span>
         <span class="stat">
           <span class="stat-label">Status:</span>
-          <span class="stat-value" style="color: white;">Ready to compress</span>
+          <span class="stat-value" style="color: #28a745;">Ready to compress</span>
         </span>
       </div>
     </div>
@@ -469,6 +469,7 @@ const closeStats = () => {
     <div v-if="showErrorPopup" class="popup-overlay" @click.self="closeError">
       <div class="error-popup">
         <div class="popup-header error">
+          <span class="error-icon">❌</span>
           <h3>File Name Issue</h3>
           <button class="close-popup" @click="closeError">✕</button>
         </div>
@@ -480,11 +481,11 @@ const closeStats = () => {
             <h4>Filename Guidelines:</h4>
             <div class="guidelines-list">
               <div class="guideline allowed">
-                <span class="guideline-icon"></span>
+                <span class="guideline-icon">✅</span>
                 <span class="guideline-text"><strong>Allowed:</strong> my-document.pdf, report_2024.pdf, file123.pdf</span>
               </div>
               <div class="guideline not-allowed">
-                <span class="guideline-icon"></span>
+                <span class="guideline-icon">❌</span>
                 <span class="guideline-text"><strong>Not Allowed:</strong> file (1).pdf, document[2].pdf, report&summary.pdf</span>
               </div>
             </div>
@@ -500,44 +501,41 @@ const closeStats = () => {
 </template>
 
 <style scoped>
-  .error-popup{
-    background: white;
-  }
 .converter {
   max-width: 500px;
   margin: 0 auto;
-  padding: 10px;
+  padding: 20px;
 }
 
 .converter h2 {
-  font-size: 20px;
+  font-size: 24px;
   margin-bottom: 8px;
   color: #2c3e50;
-  margin-top: 0px;
 }
 
 .subtitle {
   font-size: 14px;
   color: #666;
+  margin-bottom: 25px;
 }
 
 .file-info-card {
-  background: #ee6c4d;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border-radius: 12px;
-  padding: 12px;
-  margin-bottom: 5px;
+  padding: 16px;
+  margin-bottom: 20px;
 }
 
 .file-header {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 6px;
+  margin-bottom: 12px;
 }
 
 .file-icon {
-  font-size: 18px;
+  font-size: 24px;
 }
 
 .file-details {
@@ -591,16 +589,17 @@ const closeStats = () => {
   opacity: 0.9;
 }
 
-.upload-box[data-v-6523ca16] {
-    display: block;
-    text-align: center;
-    border: 2px dashed #aaa;
-    border-radius: 12px;
-    padding: 10px 5px;
-    cursor: pointer;
-    background: #f9f9f9;
-    transition: all 0.3s ease;
-    margin-bottom: 10px;
+/* Upload Box */
+.upload-box {
+  display: block;
+  text-align: center;
+  border: 2px dashed #aaa;
+  border-radius: 12px;
+  padding: 20px 10px;
+  cursor: pointer;
+  background: #f9f9f9;
+  transition: all 0.3s ease;
+  margin-bottom: 20px;
 }
 
 .upload-box:hover {
@@ -625,19 +624,23 @@ const closeStats = () => {
   font-size: 13px;
 }
 
+/* Compress Button */
 .compress-btn {
-    width: 100%;
-    padding: 8px;
-    font-size: 16px;
-    border-radius: 10px;
-    border: none;
-    cursor: pointer;
-    background: #ee6c4d;
-    color: white;
-    transition: all 0.3s ease;
+  width: 100%;
+  padding: 16px;
+  font-size: 16px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  margin-top: 10px;
 }
 
 .compress-btn:hover:not(:disabled):not(.disabled) {
+  transform: translateY(-2px);
   box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
 }
 
@@ -669,8 +672,8 @@ const closeStats = () => {
 
 /* Progress Section */
 .progress-section {
-  margin-top: 10px;
-  padding: 10px;
+  margin-top: 30px;
+  padding: 20px;
   background: #f8f9fa;
   border-radius: 12px;
   border: 1px solid #e9ecef;
@@ -680,7 +683,7 @@ const closeStats = () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: 15px;
   font-size: 14px;
   color: #2c3e50;
 }
@@ -712,9 +715,11 @@ const closeStats = () => {
 .progress-text {
   position: absolute;
   right: 10px;
-  top: 30%;
+  top: 50%;
+  transform: translateY(-50%);
   font-size: 10px;
   color: white;
+  font-weight: bold;
   text-shadow: 1px 1px 1px rgba(0,0,0,0.2);
 }
 
@@ -770,9 +775,9 @@ const closeStats = () => {
 }
 
 .popup-header {
-  background: black;
+  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
   color: white;
-  padding: 10px;
+  padding: 20px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -808,7 +813,7 @@ const closeStats = () => {
 }
 
 .popup-content {
-  padding: 12px;
+  padding: 24px;
 }
 
 .stats-summary {
@@ -868,12 +873,12 @@ const closeStats = () => {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 12px;
- 
+  margin-top: 25px;
 }
 
 .stat-item {
   background: #f8f9fa;
-  padding: 8px;
+  padding: 15px;
   border-radius: 10px;
   text-align: center;
 }
@@ -885,12 +890,15 @@ const closeStats = () => {
 
 .stat-label {
   font-size: 12px;
-    
+  color: #666;
+  margin-bottom: 8px;
+  font-weight: 500;
 }
 
 .stat-value {
- font-size: 12px;
-  
+  font-size: 18px;
+  font-weight: 700;
+  color: #2c3e50;
 }
 
 .popup-actions {
@@ -910,7 +918,7 @@ const closeStats = () => {
 }
 
 .btn-primary {
-  background: black;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
 }
 

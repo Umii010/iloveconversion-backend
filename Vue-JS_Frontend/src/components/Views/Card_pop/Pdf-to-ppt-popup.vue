@@ -193,7 +193,7 @@ const updateStatusText = (progressValue) => {
       <div class="popup-progress"></div>
     </div>
 
-    <h2 style="margin: 0;">📊 PDF to PowerPoint Converter</h2>
+    <h2>📊 PDF to PowerPoint Converter</h2>
     <!-- File Upload -->
     <label class="upload-box">
       <input type="file" accept=".pdf" @change="selectFile" hidden />
@@ -245,7 +245,7 @@ const updateStatusText = (progressValue) => {
 /* Popup */
 .popup-notification {
   position: fixed;
-  top: 60px;
+  top: 20px;
   right: 20px;
   background: white;
   border-radius: 12px;
@@ -338,8 +338,9 @@ const updateStatusText = (progressValue) => {
   cursor: pointer;
   transition: all 0.3s;
   margin: 30px 0;
-  
 }
+
+
 
 .upload-content .icon {
   font-size: 56px;
@@ -349,7 +350,9 @@ const updateStatusText = (progressValue) => {
 
 .file-info {
   display: block;
-  color: #ee6c4d;
+  margin: 15px 0 5px;
+  font-weight: 600;
+  color: #3b82f6;
   font-size: 15px;
 }
 
@@ -390,6 +393,7 @@ const updateStatusText = (progressValue) => {
   line-height: 1.5;
 }
 
+/* Ratio Options */
 .ratio-options {
   display: flex;
   flex-direction: column;
@@ -463,6 +467,7 @@ const updateStatusText = (progressValue) => {
   opacity: 1;
 }
 
+/* Quality Options */
 .quality-options {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -480,13 +485,13 @@ const updateStatusText = (progressValue) => {
 }
 
 .quality-option:hover {
-  border-color: #ee6c4d;
+  border-color: #3b82f6;
   background: #eff6ff;
- 
+  transform: translateY(-2px);
 }
 
 .quality-option.selected {
-  border-color: #ee6c4d;
+  border-color: #3b82f6;
   background: #eff6ff;
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
 }
@@ -501,7 +506,7 @@ const updateStatusText = (progressValue) => {
 .quality-dpi {
   font-size: 18px;
   font-weight: 700;
-  color: #ee6c4d;
+  color: #3b82f6;
   margin-bottom: 8px;
 }
 
@@ -536,7 +541,7 @@ const updateStatusText = (progressValue) => {
 .checkbox-option input[type="checkbox"] {
   width: 20px;
   height: 20px;
-  accent-color: #ee6c4d;
+  accent-color: #3b82f6;
   cursor: pointer;
 }
 
@@ -546,25 +551,28 @@ const updateStatusText = (progressValue) => {
   flex: 1;
 }
 
+/* Convert Button */
 .convert-btn {
-  width: 85%;
-  padding: 10px 15px;
-  background: #ee6c4d;
+  width: 100%;
+  padding: 20px 30px;
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
   color: white;
   border: none;
   border-radius: 14px;
   font-size: 18px;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.3s;
-  margin: 10px 0;
+  margin: 30px 0;
   box-shadow: 0 8px 25px rgba(59, 130, 246, 0.3);
   position: relative;
   overflow: hidden;
 }
 
 .convert-btn:hover:not(:disabled) {
+  transform: translateY(-3px);
   box-shadow: 0 12px 30px rgba(59, 130, 246, 0.4);
-  background: #ee6c4d;
+  background: linear-gradient(135deg, #2563eb, #1e40af);
 }
 
 .convert-btn:disabled {
@@ -590,9 +598,7 @@ const updateStatusText = (progressValue) => {
 
 /* Progress */
 .progress-container {
-  margin-block: 15px;
-  max-width: 599px;
-  margin: auto;
+  margin: 30px 0;
 }
 
 .progress-info {
@@ -608,8 +614,8 @@ const updateStatusText = (progressValue) => {
 }
 
 .progress-info .percentage {
-  color: green;
-  font-weight: 400;
+  color: #3b82f6;
+  font-weight: 600;
 }
 
 .progress-bar {
@@ -621,7 +627,7 @@ const updateStatusText = (progressValue) => {
 
 .progress-fill {
   height: 100%;
-  background: green;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
   border-radius: 5px;
   transition: width 0.3s ease;
   position: relative;

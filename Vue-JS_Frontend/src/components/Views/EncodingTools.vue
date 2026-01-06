@@ -2869,15 +2869,9 @@ onMounted(() => {
 /* Responsive Design */
 @media (max-width: 768px) {
   .header-content {
+    flex-direction: column;
     align-items: flex-start;
     gap: 16px;
-  }
-  
-  .code-editor{
-    width: 90%;
-  }
-  .example-item{
-    display: block;
   }
   
   .tool-categories {

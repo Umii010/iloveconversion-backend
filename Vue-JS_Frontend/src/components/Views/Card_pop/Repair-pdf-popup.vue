@@ -303,7 +303,7 @@ const repairPdf = async () => {
       
       // Show warning notification
       showNotification(
-        `PDF Could Not Be Fully Repaired\n` +
+        `⚠️ PDF Could Not Be Fully Repaired\n` +
         `The file appears to be severely corrupted or encrypted.\n` +
         `Downloading repair report with recovery instructions...`,
         'warning'
@@ -319,7 +319,7 @@ const repairPdf = async () => {
 
   } catch (err) {
     repairStatus.value = 'analyzing'
-    statusText.value = 'Repair failed'
+    statusText.value = '❌ Repair failed'
     
     // Show error notification
     let errorMessage = 'Repair failed: ' + err.message;
@@ -588,6 +588,42 @@ onMounted(() => {
       </div>
     </label>
 
+
+    <!-- Repair Progress (when repairing) -->
+    <div v-if="repairStatus === 'repairing'" class="repair-progress">
+      <h3>🔧 Repairing PDF...</h3>
+      <div class="progress-steps">
+        <div class="step" :class="{ active: progress >= 0 }">
+          <div class="step-number">1</div>
+          <div class="step-info">
+            <h5>Backup</h5>
+            <p>Creating backup of original file</p>
+          </div>
+        </div>
+        <div class="step" :class="{ active: progress >= 25 }">
+          <div class="step-number">2</div>
+          <div class="step-info">
+            <h5>Structure</h5>
+            <p>Rebuilding PDF structure</p>
+          </div>
+        </div>
+        <div class="step" :class="{ active: progress >= 50 }">
+          <div class="step-number">3</div>
+          <div class="step-info">
+            <h5>Content</h5>
+            <p>Recovering damaged content</p>
+          </div>
+        </div>
+        <div class="step" :class="{ active: progress >= 75 }">
+          <div class="step-number">4</div>
+          <div class="step-info">
+            <h5>Finalize</h5>
+            <p>Finalizing repaired document</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Success Message -->
     <div v-if="repairStatus === 'completed' && scanResults?.repairSuccessful" class="success-message">
       <div class="success-icon">✅</div>
@@ -617,7 +653,7 @@ onMounted(() => {
         class="secondary-btn"
         :disabled="loading"
       >
-         Start Over
+        🔄 Start Over
       </button>
       
       <button 
@@ -626,7 +662,7 @@ onMounted(() => {
         class="scan-btn"
         :disabled="loading"
       >
-         Scan Issues
+        🔍 Scan for Issues
       </button>
       
       <button 
@@ -635,7 +671,7 @@ onMounted(() => {
         :disabled="loading || !file || detectedIssues.length === 0"
         :class="{ disabled: loading || !file || detectedIssues.length === 0 }"
       >
-        <span v-if="loading"> Repairing... {{ progress.toFixed(0) }}%</span>
+        <span v-if="loading">🔄 Repairing... {{ progress.toFixed(0) }}%</span>
         <span v-else> Repair PDF Now</span>
       </button>
     </div>
@@ -664,7 +700,6 @@ h2 {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   font-weight: 500;
-  margin-bottom: 5px;
 }
 
 .subtitle {
@@ -677,7 +712,7 @@ h2 {
   display: block;
   border: 3px dashed #d1d5db;
   border-radius: 16px;
-  padding: 10px 5px;
+  padding: 20px 10px;
   cursor: pointer;
   background: #f9fafb;
   transition: all 0.3s ease;
@@ -701,9 +736,8 @@ h2 {
 
 .upload-content p {
   font-size: 18px;
+  font-weight: 600;
   color: #374151;
-  font-weight: 300;
-  margin: 0;
 }
 
 .upload-content small {
@@ -1179,8 +1213,8 @@ h2 {
   background: linear-gradient(135deg, #fffbeb, #fef3c7);
   border: 2px solid #f59e0b;
   border-radius: 16px;
-  padding: 20px;
-  margin-bottom: 10px;
+  padding: 40px;
+  margin-bottom: 30px;
   text-align: center;
   animation: slideIn 0.5s ease;
 }
@@ -1200,7 +1234,7 @@ h2 {
 .warning-message p {
   font-size: 16px;
   color: #92400e;
-  margin: 0 0 5px 0;
+  margin: 0 0 30px 0;
   line-height: 1.6;
   opacity: 0.9;
 }
@@ -1382,21 +1416,22 @@ h2 {
 /* Action Buttons */
 .action-buttons {
   display: flex;
-  gap: 10px;
+  gap: 20px;
   justify-content: center;
-  margin: 10px 0;
+  margin: 40px 0;
   flex-wrap: wrap;
 }
 
 .repair-btn {
   flex: 1;
   max-width: 350px;
-  padding: 10px 15px;
+  padding: 20px 30px;
   background: linear-gradient(135deg, #e74c3c, #c0392b);
   color: white;
   border: none;
   border-radius: 14px;
   font-size: 18px;
+  font-weight: 700;
   cursor: pointer;
   transition: all 0.3s;
   box-shadow: 0 8px 25px rgba(231, 76, 60, 0.3);
@@ -1404,7 +1439,13 @@ h2 {
   align-items: center;
   justify-content: center;
   gap: 15px;
-  min-height: 40px;
+  min-height: 60px;
+}
+
+.repair-btn:hover:not(:disabled) {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 30px rgba(231, 76, 60, 0.4);
+  background: linear-gradient(135deg, #c0392b, #a93226);
 }
 
 .repair-btn:disabled {
@@ -1415,6 +1456,7 @@ h2 {
 }
 
 .secondary-btn {
+  padding: 20px 30px;
   background: white;
   border: 2px solid #d1d5db;
   border-radius: 14px;
@@ -1442,19 +1484,27 @@ h2 {
 }
 
 .scan-btn {
+  padding: 20px 30px;
   background: linear-gradient(135deg, #3498db, #2980b9);
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: 14px;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
-  font-size: 14px;
+  min-width: 180px;
+  font-size: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
 }
 
+.scan-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(52, 152, 219, 0.3);
+  background: linear-gradient(135deg, #2980b9, #1f6399);
+}
 
 .scan-btn:disabled {
   opacity: 0.6;
