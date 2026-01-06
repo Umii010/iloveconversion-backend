@@ -242,14 +242,13 @@ const unlockPdf = async () => {
 
 .converter h2 {
   font-size: 22px;
-  margin-bottom: 4px;
+  margin:0;
   color: #333;
 }
 
 .subtitle {
   font-size: 14px;
   color: #666;
-  margin-bottom: 25px;
 }
 
 /* File Upload */
@@ -257,24 +256,24 @@ const unlockPdf = async () => {
   display: block;
   border: 2px dashed #aaa;
   border-radius: 12px;
-  padding: 30px 20px;
+  padding: 15px 10px;
   cursor: pointer;
   transition: all 0.3s ease;
   background: #f9f9f9;
-  margin-bottom: 25px;
+  max-width: 550px;
+  margin: auto;
+  margin-block-end: 10px;
 }
 
 .upload-box:hover {
   border-color: #9C27B0;
   background: #f3e5f5;
-  transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(156, 39, 176, 0.1);
 }
 
 .upload-content .icon {
-  font-size: 36px;
+  font-size: 25px;
   display: block;
-  margin-bottom: 10px;
 }
 
 .upload-content p {
@@ -295,10 +294,10 @@ const unlockPdf = async () => {
   margin-top: 5px !important;
 }
 
-/* Password Section */
 .password-section {
-  margin-bottom: 25px;
-  text-align: left;
+ text-align: left;
+ max-width: 576px;
+ margin: auto;
 }
 
 .input-wrapper {
@@ -307,10 +306,10 @@ const unlockPdf = async () => {
 
 .input-wrapper label {
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
   font-size: 14px;
   color: #333;
-  font-weight: 500;
+  margin-top: 15px;
 }
 
 .input-with-icon {
@@ -318,13 +317,13 @@ const unlockPdf = async () => {
 }
 
 .input-with-icon input {
-  width: 100%;
-  padding: 12px 15px;
+  padding: 6px 8px;
   border-radius: 8px;
   border: 2px solid #e0e0e0;
   font-size: 15px;
   transition: all 0.3s ease;
   background: white;
+  width: 97%;
 }
 
 .input-with-icon input:focus {
@@ -339,7 +338,7 @@ const unlockPdf = async () => {
 }
 
 .input-hint {
-  margin-top: 5px;
+ 
   text-align: right;
 }
 
@@ -352,18 +351,17 @@ const unlockPdf = async () => {
 /* Unlock Button */
 .unlock-btn {
   width: 100%;
-  padding: 16px;
+  padding: 10px;
   font-size: 16px;
   border-radius: 10px;
-  margin-top: 20px;
   border: none;
   cursor: pointer;
   background: linear-gradient(135deg, #9C27B0 0%, #7B1FA2 100%);
   color: white;
-  font-weight: 600;
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
+  max-width: 576px;
 }
 
 .unlock-btn:hover:not(:disabled) {
@@ -384,21 +382,22 @@ const unlockPdf = async () => {
   background: #95a5a6;
 }
 
-/* Progress Container */
 .progress-container {
-  margin-top: 25px;
-  padding: 20px;
+  margin-top: 10px;
+  padding: 10px;
   background: #f8f9fa;
   border-radius: 12px;
   border: 1px solid #e9ecef;
+  max-width: 555px;
+  margin-inline: auto;
 }
 
 .status-text {
-  margin-bottom: 15px;
+  margin-bottom:5px;
   font-size: 15px;
   color: #333;
   font-weight: 500;
-  min-height: 24px;
+  min-height: 20px;
 }
 
 .progress-wrapper {
@@ -411,7 +410,7 @@ const unlockPdf = async () => {
 
 .progress-bar {
   height: 100%;
-  background: linear-gradient(90deg, #9C27B0, #7B1FA2);
+  background: green;
   transition: width 0.3s ease;
   position: relative;
 }
@@ -458,7 +457,6 @@ const unlockPdf = async () => {
 
 /* Status Message */
 .status-message {
-  margin-top: 15px;
   font-size: 14px;
   color: #9C27B0;
   font-weight: 500;
@@ -466,6 +464,9 @@ const unlockPdf = async () => {
   background: #f3e5f5;
   border-radius: 8px;
   animation: fadeIn 0.3s ease;
+  margin-inline: auto;
+  margin-bottom: 3px;
+  max-width: 555px;
 }
 
 @keyframes fadeIn {
@@ -492,7 +493,7 @@ const unlockPdf = async () => {
 .popup-content {
   background: white;
   border-radius: 16px;
-  padding: 25px;
+  padding: 15px;
   width: 100%;
   max-width: 400px;
   text-align: center;
@@ -536,8 +537,7 @@ const unlockPdf = async () => {
 }
 
 .popup-icon {
-  font-size: 48px;
-  margin-bottom: 15px;
+  font-size: 18px;
   animation: bounce 0.5s ease;
 }
 
@@ -558,7 +558,7 @@ const unlockPdf = async () => {
 }
 
 .popup-content > p {
-  margin: 0 0 20px 0;
+  margin: 0 0 5px 0;
   color: #666;
   font-size: 15px;
   line-height: 1.4;
@@ -610,8 +610,8 @@ const unlockPdf = async () => {
 .error-tips {
   background: #ffebee;
   border-radius: 10px;
-  padding: 15px;
-  margin: 0 0 20px 0;
+  padding: 10px;
+  margin: 0 0 10px 0;
   text-align: left;
   border-left: 4px solid #f44336;
 }
@@ -642,7 +642,7 @@ const unlockPdf = async () => {
 }
 
 .popup-btn {
-  padding: 10px 20px;
+  padding: 8px 15px;
   border-radius: 8px;
   border: none;
   background: linear-gradient(135deg, #9C27B0 0%, #7B1FA2 100%);

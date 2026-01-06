@@ -258,7 +258,7 @@ const handleDrop = (e) => {
 
 <template>
   <div class="converter">
-    <h2>🖼️ Images to PDF Converter</h2>
+    <h2>Images to PDF Converter</h2>
     <p class="subtitle">Combine multiple images into a single PDF document</p>
 
 
@@ -380,19 +380,18 @@ const handleDrop = (e) => {
 .converter {
   max-width: 600px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 10px;
 }
 
 .converter h2 {
   font-size: 24px;
-  margin-bottom: 8px;
+  margin: 0;
   color: #2c3e50;
 }
 
 .subtitle {
   font-size: 14px;
   color: #666;
-  margin-bottom: 25px;
 }
 
 /* Supported Formats */
@@ -449,12 +448,12 @@ const handleDrop = (e) => {
 
 /* File Summary */
 .file-summary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 16px 20px;
-  border-radius: 12px;
-  margin-bottom: 20px;
-  text-align: left;
+ margin-top: 10px;
+    background: #ee6c4d;
+    color: white;
+    padding: 8px 10px;
+    border-radius: 12px;
+    text-align: left;
 }
 
 .summary-header {
@@ -467,7 +466,7 @@ const handleDrop = (e) => {
 .summary-header h3 {
   margin: 0;
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 300;
 }
 
 .clear-all-btn {
@@ -493,7 +492,7 @@ const handleDrop = (e) => {
 .summary-stats {
   display: flex;
   gap: 20px;
-  font-size: 13px;
+  font-size: 12px;
   flex-wrap: wrap;
 }
 
@@ -507,11 +506,10 @@ const handleDrop = (e) => {
   display: block;
   border: 2px dashed #aaa;
   border-radius: 12px;
-  padding: 20px 10px;
+  padding: 10px 5px;
   cursor: pointer;
   background: #f9f9f9;
   transition: all 0.3s ease;
-  margin-bottom: 20px;
   text-align: center;
 }
 
@@ -540,7 +538,6 @@ const handleDrop = (e) => {
 }
 
 .upload-tips {
-  margin-top: 10px;
   padding: 8px;
   background: #f8f9fa;
   border-radius: 6px;
@@ -635,16 +632,15 @@ const handleDrop = (e) => {
 /* Convert Button */
 .convert-btn {
   width: 100%;
-  padding: 16px;
+  padding: 8px;
   font-size: 16px;
   border-radius: 10px;
   border: none;
   cursor: pointer;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #ee6c4d;
   color: white;
-  font-weight: 600;
   transition: all 0.3s ease;
-  margin-top: 10px;
+  margin-top: 5px;
   position: relative;
   overflow: hidden;
 }
@@ -682,8 +678,8 @@ const handleDrop = (e) => {
 
 /* Progress Section */
 .progress-section {
-  margin-top: 30px;
-  padding: 20px;
+  margin-top: 10px;
+  padding: 10px;
   background: #f8f9fa;
   border-radius: 12px;
   border: 1px solid #e9ecef;
@@ -693,7 +689,7 @@ const handleDrop = (e) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 15px;
+  margin-bottom: 5px;
   font-size: 14px;
   color: #2c3e50;
 }
@@ -785,9 +781,9 @@ const handleDrop = (e) => {
 }
 
 .popup-header {
-  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+  background: black;
   color: white;
-  padding: 20px;
+  padding: 5px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -798,6 +794,7 @@ const handleDrop = (e) => {
   flex: 1;
   text-align: center;
   font-size: 18px;
+  font-weight: 300;
 }
 
 .success-icon {
@@ -823,7 +820,7 @@ const handleDrop = (e) => {
 }
 
 .popup-content {
-  padding: 24px;
+  padding: 8px;
 }
 
 .stats-summary {
@@ -909,12 +906,11 @@ const handleDrop = (e) => {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 12px;
-  margin: 25px 0;
 }
 
 .stat-item {
   background: #f8f9fa;
-  padding: 15px;
+  padding: 5px;
   border-radius: 10px;
   text-align: center;
 }
@@ -948,7 +944,7 @@ const handleDrop = (e) => {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: black;
   color: white;
 }
 

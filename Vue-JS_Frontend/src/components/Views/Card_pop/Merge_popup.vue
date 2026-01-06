@@ -354,12 +354,11 @@ const handleDrop = (e) => {
 
 /* File Summary */
 .file-summary {
-  background: black;
+  background: #ee6c4d;
   color: white;
-  padding: 16px 20px;
+  padding: 10px 15px;
   border-radius: 12px;
-  margin-bottom: 20px;
-  text-align: left;
+  margin-bottom: 10px;
 }
 
 .summary-header {
@@ -411,11 +410,11 @@ const handleDrop = (e) => {
   display: block;
   border: 2px dashed #aaa;
   border-radius: 12px;
-  padding: 20px 10px;
+  padding: 5px 5px;
   cursor: pointer;
   transition: all 0.3s ease;
   background: #f9f9f9;
-  margin-bottom: 20px;
+  margin-bottom: 10px;
 }
 
 .upload-box:hover, .upload-box.drag-over {
@@ -441,7 +440,6 @@ const handleDrop = (e) => {
   font-size: 13px;
 }
 
-/* File List */
 .file-list-container {
   max-height: 300px;
   overflow-y: auto;
@@ -525,16 +523,15 @@ const handleDrop = (e) => {
   cursor: not-allowed;
 }
 
-/* Merge Button */
 .merge-btn {
-  padding: 16px;
-  font-size: 16px;
+  width: 100%;
+  padding: 12px;
+  font-size: 14px;
   border-radius: 10px;
   border: none;
   cursor: pointer;
-  background: black;
+  background: #ee6c4d;
   color: white;
-  font-weight: 400;
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
@@ -570,10 +567,9 @@ const handleDrop = (e) => {
   to { transform: rotate(360deg); }
 }
 
-/* Progress Section */
 .progress-section {
-  margin-top: 30px;
-  padding: 20px;
+  margin-top: 10px;
+  padding: 10px;
   background: #f8f9fa;
   border-radius: 12px;
   border: 1px solid #e9ecef;
@@ -583,7 +579,7 @@ const handleDrop = (e) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 15px;
+  margin-bottom: 5px;
   font-size: 14px;
   color: #2c3e50;
 }
@@ -597,7 +593,7 @@ const handleDrop = (e) => {
 }
 
 .progress-wrapper {
-  height: 12px;
+  height: 10px;
   width: 100%;
   background: #e9ecef;
   border-radius: 8px;
@@ -615,7 +611,7 @@ const handleDrop = (e) => {
 .progress-text {
   position: absolute;
   right: 10px;
-  top: 50%;
+  top: 20%;
   transform: translateY(-50%);
   font-size: 10px;
   color: white;
@@ -630,7 +626,6 @@ const handleDrop = (e) => {
   min-height: 20px;
 }
 
-/* Success Popup */
 .popup-overlay {
   position: fixed;
   top: 0;

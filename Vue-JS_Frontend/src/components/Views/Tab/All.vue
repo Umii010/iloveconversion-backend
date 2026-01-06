@@ -135,13 +135,9 @@ const components = {
     cursor: pointer;
     transition: all 0.3s ease;
 }
-
 .card:hover {
-    
-    transform: translateY(-6px);
     box-shadow: 4px 8px 20px rgba(0,0,0,0.25);
 }
-
 .card:active {
     transform: scale(0.97);
 }
@@ -164,7 +160,7 @@ const components = {
 }
 
 .popup-box {
-  top: 40px;
+  top: 0px;
   position: relative;
   z-index: 10;
   width: 900px;

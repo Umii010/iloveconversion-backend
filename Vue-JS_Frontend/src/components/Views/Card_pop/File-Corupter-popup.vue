@@ -12,7 +12,7 @@
         hidden
       />
       <div class="upload-content">
-        <p><strong>Choose file to corrupt</strong></p>
+        <p style="margin: 0;"><strong>Choose file to corrupt</strong></p>
         <small>Supported: {{ supportedFormats }}</small>
         <div class="file-types">
           <span class="file-type-badge">PDF</span>
@@ -26,6 +26,7 @@
     </label>
 
     <!-- Corruption Button -->
+     <div style="display: flex; justify-content: center;">
     <button 
       class="corrupt-btn" 
       @click="corruptFile" 
@@ -37,22 +38,22 @@
       }"
     >
       <span v-if="!loading">
-         CORRUPT FILE
+         Corrupt File
       </span>
       <span v-else>
         <span class="spinner"></span> Corrupting...
       </span>
-    </button>
+    </button></div>
 
     <!-- Confirmation Dialog -->
     <div v-if="showConfirmation" class="confirmation-overlay">
       <div class="confirmation-dialog">
         <div class="confirmation-header">
-          <h3>FINAL WARNING ?</h3>
+          <h3 style="margin: 0;">Final Warning ?</h3>
         </div>
         
         <div class="confirmation-content">
-          <p>You are about to <strong>PERMANENTLY CORRUPT</strong>:</p>
+          <p style="margin: 0;">You are about to <strong>PERMANENTLY CORRUPT</strong>:</p>
           <div class="file-to-corrupt">
             <span class="file-icon">{{ getFileIcon(file.type) }}</span>
             <div>
@@ -78,7 +79,6 @@
     <!-- Progress Section -->
     <div v-if="loading" class="progress-section">
       <div class="progress-header">
-        <span>Corruption Progress</span>
         <span class="corrupt-method">{{ corruptionMethod.toUpperCase() }}</span>
       </div>
       
@@ -249,7 +249,7 @@ const closeSuccess = () => {
 .corruptor {
   max-width: 600px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 10px;
 }
 
 .warning-alert {
@@ -410,11 +410,11 @@ const closeSuccess = () => {
   display: block;
   border: 2px dashed #aaa;
   border-radius: 12px;
-  padding: 20px 10px;
+  padding: 10px 5px;
   cursor: pointer;
   background: #f9f9f9;
   transition: all 0.3s ease;
-  margin: 20px 0;
+  margin: 10px 0;
 }
 
 .upload-box:hover {
@@ -449,30 +449,23 @@ const closeSuccess = () => {
 /* Corrupt Button */
 .corrupt-btn {
   width: 100%;
-  padding: 18px;
-  font-size: 18px;
+  padding: 10px;
+  font-size: 15px;
   border-radius: 10px;
   border: none;
   cursor: pointer;
   background: linear-gradient(135deg, #ff6b6b 0%, #c92a2a 100%);
   color: white;
   transition: all 0.3s ease;
-  margin-top: 20px;
-  letter-spacing: 1px;
 }
 
 .corrupt-btn:hover:not(:disabled) {
-  transform: translateY(-3px);
   box-shadow: 0 10px 30px rgba(255, 107, 107, 0.4);
 }
 
 .corrupt-btn:disabled {
   background: #6c757d;
   cursor: not-allowed;
-}
-
-.corrupt-btn.danger {
-  animation: danger-pulse 1.5s infinite;
 }
 
 @keyframes danger-pulse {
@@ -519,7 +512,7 @@ const closeSuccess = () => {
 .confirmation-header {
   background: linear-gradient(135deg, #ff6b6b 0%, #c92a2a 100%);
   color: white;
-  padding: 20px;
+  padding: 10px;
   text-align: center;
 }
 
@@ -530,7 +523,7 @@ const closeSuccess = () => {
 }
 
 .confirmation-content {
-  padding: 25px;
+  padding: 10px;
 }
 
 .file-to-corrupt {
@@ -538,20 +531,20 @@ const closeSuccess = () => {
   align-items: center;
   gap: 15px;
   background: #f8f9fa;
-  padding: 15px;
+  padding: 5px;
   border-radius: 8px;
-  margin: 15px 0;
+  margin: 5px 0;
 }
 
 .file-to-corrupt .file-icon {
-  font-size: 32px;
+  font-size: 16px;
 }
 
 .corruption-details {
   background: #fff5f5;
-  padding: 15px;
+  padding: 5px;
   border-radius: 8px;
-  margin: 15px 0;
+  margin: 5px 0;
 }
 
 .corruption-details p {
@@ -560,11 +553,10 @@ const closeSuccess = () => {
 
 .final-warning {
   text-align: center;
-  font-size: 18px;
-  font-weight: bold;
+  font-size: 14px;
   color: #ff6b6b;
-  margin: 20px 0;
-  padding: 10px;
+  margin: 5px 0;
+  padding: 5px;
   background: rgba(255, 107, 107, 0.1);
   border-radius: 8px;
 }
@@ -572,16 +564,15 @@ const closeSuccess = () => {
 .confirmation-actions {
   display: flex;
   gap: 15px;
-  padding: 20px;
+  padding: 5px;
   border-top: 1px solid #dee2e6;
 }
 
 .cancel-btn, .confirm-btn {
   flex: 1;
-  padding: 15px;
+  padding: 10px;
   border-radius: 8px;
   border: none;
-  font-weight: bold;
   cursor: pointer;
   transition: all 0.3s ease;
 }
@@ -651,16 +642,16 @@ const closeSuccess = () => {
   font-size: 24px;
 }
 
-.download-btn {
-  display: inline-block;
-  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-  color: white;
-  padding: 12px 25px;
-  border-radius: 8px;
-  text-decoration: none;
-  font-weight: bold;
-  margin-top: 10px;
-  transition: all 0.3s ease;
+.download-btn[data-v-1a468976] {
+    justify-content: center;
+    display: flex;
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+    padding: 12px 25px;
+    border-radius: 8px;
+    text-decoration: none;
+    margin-top: 5px;
+    transition: all 0.3s ease;
 }
 
 .download-btn:hover {
@@ -692,8 +683,5 @@ const closeSuccess = () => {
     grid-template-columns: 1fr;
   }
   
-  .corruptor {
-    padding: 15px;
-  }
 }
 </style>

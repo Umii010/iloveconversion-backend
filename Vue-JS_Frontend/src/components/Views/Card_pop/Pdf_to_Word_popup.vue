@@ -254,23 +254,19 @@ const getTimeEstimate = (size) => {
   text-align: center;
   max-width: 500px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 10px;
 }
 
 .converter h2 {
   font-size: 24px;
-  margin-bottom: 8px;
+  margin: 0px;
   color: #2c3e50;
+  font-weight: 500;
 }
 
 .subtitle {
   font-size: 14px;
   color: #666;
-  margin-bottom: 30px;
-}
-
-.file-info {
-  margin-bottom: 20px;
 }
 
 .file-details {
@@ -283,8 +279,8 @@ const getTimeEstimate = (size) => {
 }
 
 .file-icon {
-  font-size: 24px;
-  margin-right: 12px;
+  font-size: 17px;
+  margin-right: 8px;
 }
 
 .file-text {
@@ -326,11 +322,10 @@ const getTimeEstimate = (size) => {
   display: block;
   border: 2px dashed #aaa;
   border-radius: 12px;
-  padding: 20px 10px;
+  padding: 10px 5px;
   cursor: pointer;
   transition: all 0.3s ease;
   background: #f9f9f9;
-  margin-bottom: 20px;
 }
 
 .upload-box:hover {
@@ -355,16 +350,15 @@ const getTimeEstimate = (size) => {
 
 .convert-btn {
   width: 100%;
-  padding: 14px;
+  padding: 10px;
   font-size: 16px;
   border-radius: 10px;
   border: none;
   cursor: pointer;
   background: rgb(238, 108, 77);
   color: white;
-  font-weight: 600;
   transition: all 0.3s ease;
-  margin-top: 10px;
+  margin-top: 5px;
 }
 
 .convert-btn:hover:not(:disabled) {
@@ -401,8 +395,8 @@ const getTimeEstimate = (size) => {
 
 /* Progress Section */
 .progress-section {
-  margin-top: 30px;
-  padding: 20px;
+  margin-top: 10px;
+  padding: 5px;
   background: #f8f9fa;
   border-radius: 12px;
   border: 1px solid #e9ecef;
@@ -453,10 +447,9 @@ const getTimeEstimate = (size) => {
 }
 
 .status-text {
-  margin-top: 12px;
   font-size: 14px;
   color: #495057;
-  min-height: 20px;
+  margin: 0;
 }
 
 /* Success Popup */
@@ -496,9 +489,9 @@ const getTimeEstimate = (size) => {
 }
 
 .popup-header {
-  background: linear-gradient(135deg, #4CAF50, #45a049);
+  background: black;
   color: white;
-  padding: 20px;
+  padding: 10px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -541,12 +534,11 @@ const getTimeEstimate = (size) => {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
-  margin-bottom: 24px;
 }
 
 .stat-item {
   text-align: left;
-  padding: 8px 0;
+  padding: 4px 0;
   border-bottom: 1px solid #f0f0f0;
 }
 
@@ -572,7 +564,7 @@ const getTimeEstimate = (size) => {
 
 .btn-primary, .btn-secondary {
   flex: 1;
-  padding: 12px;
+  padding: 8px;
   border-radius: 8px;
   border: none;
   cursor: pointer;
@@ -581,7 +573,7 @@ const getTimeEstimate = (size) => {
 }
 
 .btn-primary {
-  background: rgb(238, 108, 77);
+  background: black;
   color: white;
 }
 

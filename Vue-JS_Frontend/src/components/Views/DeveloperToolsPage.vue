@@ -1269,6 +1269,7 @@ onMounted(() => {
   min-height: 100vh;
   background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
   transition: background 0.3s ease;
+  border-radius: 20px;
 }
 
 [data-theme="dark"] .developer-tools-page {
@@ -2194,7 +2195,7 @@ onMounted(() => {
 
 @media (max-width: 480px) {
   .code-editor {
-    width: 100%;
+    width: 90%;
   }
 }
 </style>

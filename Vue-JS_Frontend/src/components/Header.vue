@@ -168,9 +168,6 @@ const closeMenu = () => {
 
             <div class="login__section">
                 <div class="cta-wrapper">
-                    <button class="cta-btn">
-                        Open Account
-                    </button>
                     <div>
                         <span class="arrow">
                             ↗
