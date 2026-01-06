@@ -465,8 +465,8 @@ loadSample()
 
 .lang-btn.active {
   background: #e7f3ff;
-  border-color: #264de4;
-  color: #264de4;
+  border-color: green;
+  color: black;
 }
 
 .lang-icon {
@@ -532,7 +532,7 @@ loadSample()
 
 .code-input {
   width: 100%;
-  min-height: 120px;
+  min-height: 70px;
   padding: 5px;
   border: none;
   resize: vertical;
@@ -557,7 +557,7 @@ loadSample()
 
 .action-buttons {
   display: flex;
-  gap: 15px;
+  gap: 5px;
 }
 
 .action-btn {
@@ -575,17 +575,17 @@ loadSample()
 }
 
 .action-btn.beautify {
-  background: #e9ecef;
-  color: #2c3e50;
+  background: black;
+  color: white ;
 }
 
 .action-btn.minify.active {
-  background: linear-gradient(135deg, #264de4 0%, #4a6bdb 100%);
+  background:#ee6c4d;
   color: white;
 }
 
 .action-btn.beautify.active {
-  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+  background:black;
   color: white;
 }
 
@@ -625,18 +625,16 @@ loadSample()
 .process-btn {
   width: 100%;
   padding: 10px;
-  background: linear-gradient(135deg, #264de4 0%, #6f42c1 100%);
+  background: #ee6c4d;
   color: white;
   border: none;
   border-radius: 10px;
   cursor: pointer;
   font-size: 18px;
-  font-weight: 600;
   transition: all 0.3s ease;
 }
 
 .process-btn:hover:not(:disabled) {
-  transform: translateY(-2px);
   box-shadow: 0 8px 25px rgba(38, 77, 228, 0.3);
 }
 

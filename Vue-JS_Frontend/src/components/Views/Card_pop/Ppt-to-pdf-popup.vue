@@ -14,7 +14,6 @@ let startTime = null
 let timerInterval = null
 let fakeProgressInterval = null
 
-// Update elapsed time
 const updateTimer = () => {
   if (!startTime) return
   
@@ -100,7 +99,6 @@ const selectFile = (e) => {
   showNotification(`✓ ${selectedFile.name} loaded (${fileSizeMB.toFixed(1)} MB)`, 3000)
 }
 
-// Conversion function
 const convertPptToPdf = async () => {
   if (!file.value) {
     showNotification('Please select a PowerPoint file first', 3000)
@@ -109,10 +107,8 @@ const convertPptToPdf = async () => {
 
   loading.value = true
   progress.value = 0
-  statusText.value = 'Initializing conversion...'
   startTimer()
   
-  // Reset popup
   showPopup.value = false
 
   const formData = new FormData()
@@ -144,7 +140,6 @@ const convertPptToPdf = async () => {
       throw new Error(`Server error: ${res.status} - ${errorText}`)
     }
 
-    // Get filename
     const contentDisposition = res.headers.get('content-disposition')
     let fileName = `${file.value.name.replace(/\.[^/.]+$/, '')}.pdf`
     
@@ -199,7 +194,7 @@ const convertPptToPdf = async () => {
       userMessage += 'Please try again.'
     }
     
-    showNotification(`❌ ${userMessage}`, 5000)
+    showNotification(` ${userMessage}`, 5000)
     statusText.value = 'Conversion failed'
     
   } finally {
@@ -213,25 +208,6 @@ const convertPptToPdf = async () => {
       statusText.value = ''
       timeElapsed.value = '0s'
     }, 2000)
-  }
-}
-
-// Update status text based on progress
-const updateStatusText = (progressValue) => {
-  if (progressValue < 10) {
-    statusText.value = 'Uploading file to server...'
-  } else if (progressValue < 25) {
-    statusText.value = 'Analyzing PowerPoint structure...'
-  } else if (progressValue < 45) {
-    statusText.value = 'Processing slides...'
-  } else if (progressValue < 65) {
-    statusText.value = 'Converting to PDF format...'
-  } else if (progressValue < 85) {
-    statusText.value = 'Optimizing PDF output...'
-  } else if (progressValue < 95) {
-    statusText.value = 'Finalizing document...'
-  } else {
-    statusText.value = 'Preparing download...'
   }
 }
 
@@ -286,23 +262,6 @@ onUnmounted(() => {
         </div>
       </div>
     </label>
-
-    <!-- File Info & Stats -->
-    <div v-if="file" class="file-stats">
-      <div class="stat-item">
-        <span class="stat-label">File Name:</span>
-        <span class="stat-value">{{ file.name }}</span>
-      </div>
-      <div class="stat-item">
-        <span class="stat-label">File Size:</span>
-        <span class="stat-value">{{ (file.size / (1024 * 1024)).toFixed(2) }} MB</span>
-      </div>
-      <div class="stat-item">
-        <span class="stat-label">Estimated Time:</span>
-        <span class="stat-value">{{ estimatedTime }}</span>
-      </div>
-    </div>
-
     <!-- Action Buttons -->
     <div class="action-buttons">
       <button 
@@ -311,7 +270,7 @@ onUnmounted(() => {
         class="secondary-btn"
         :disabled="loading"
       >
-        ✕ Clear File
+         Clear File
       </button>
       <button 
         class="convert-btn" 
@@ -328,56 +287,6 @@ onUnmounted(() => {
         </template>
       </button>
     </div>
-
-    <!-- Progress Section -->
-    <div v-if="loading" class="progress-section">
-      <div class="progress-header">
-        <span class="status">{{ statusText }}</span>
-        <span class="timer">⏱️ {{ timeElapsed }}</span>
-      </div>
-      
-      <div class="progress-container">
-        <div class="progress-bar">
-          <div 
-            class="progress-fill" 
-            :style="{ width: progress + '%' }"
-          >
-            <span class="progress-text">{{ progress.toFixed(0) }}%</span>
-          </div>
-        </div>
-        
-        <div class="progress-labels">
-          <span>0%</span>
-          <span>25%</span>
-          <span>50%</span>
-          <span>75%</span>
-          <span>100%</span>
-        </div>
-      </div>
-      
-      <div class="progress-stages">
-        <div class="stage" :class="{ active: progress >= 10 }">
-          <div class="stage-dot"></div>
-          <span class="stage-label">Upload</span>
-        </div>
-        <div class="stage" :class="{ active: progress >= 30 }">
-          <div class="stage-dot"></div>
-          <span class="stage-label">Analyze</span>
-        </div>
-        <div class="stage" :class="{ active: progress >= 50 }">
-          <div class="stage-dot"></div>
-          <span class="stage-label">Convert</span>
-        </div>
-        <div class="stage" :class="{ active: progress >= 80 }">
-          <div class="stage-dot"></div>
-          <span class="stage-label">Optimize</span>
-        </div>
-        <div class="stage" :class="{ active: progress >= 95 }">
-          <div class="stage-dot"></div>
-          <span class="stage-label">Download</span>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -385,7 +294,7 @@ onUnmounted(() => {
 .converter {
   max-width: 700px;
   margin: 0 auto;
-  padding: 30px 20px;
+  padding: 20px 10px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
@@ -393,19 +302,20 @@ h2 {
   font-size: 24px;
   color: #2d3748;
   text-align: center;
-  font-weight: 500;
+  margin: 0;
+  font-weight: 400;
 }
 
 .subtitle {
   color: #718096;
   text-align: center;
   font-size: 16px;
+  margin-bottom: 5px;
 }
 
-/* Popup Notification */
 .popup-notification {
   position: fixed;
-  top: 20px;
+  top: 60px;
   right: 20px;
   background: white;
   border-radius: 12px;
@@ -472,7 +382,7 @@ h2 {
   display: block;
   border: 3px dashed #d1d5db;
   border-radius: 16px;
-  padding: 20px 10px;
+  padding: 10px 5px;
   cursor: pointer;
   background: #f9fafb;
   transition: all 0.3s;
@@ -509,7 +419,6 @@ h2 {
 .supported-formats {
   font-size: 13px;
   color: #9ca3af;
-  margin-bottom: 25px;
 }
 
 .selected-file {
@@ -546,8 +455,8 @@ h2 {
 .file-stats {
   background: white;
   border-radius: 12px;
-  padding: 25px;
-  margin: 25px 0;
+  padding: 10px;
+  margin: 10px 0;
   border: 1px solid #e5e7eb;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
@@ -581,19 +490,18 @@ h2 {
   display: flex;
   gap: 20px;
   justify-content: center;
-  margin: 40px 0;
+  margin: 10px 0;
 }
 
 .convert-btn {
   flex: 1;
   max-width: 350px;
-  padding: 20px 30px;
+  padding: 10px 0px;
   background: linear-gradient(135deg, #8b5cf6, #7c3aed);
   color: white;
   border: none;
   border-radius: 14px;
-  font-size: 18px;
-  font-weight: 600;
+  font-size: 16px;
   cursor: pointer;
   transition: all 0.3s;
   box-shadow: 0 8px 25px rgba(139, 92, 246, 0.3);
@@ -601,11 +509,9 @@ h2 {
   align-items: center;
   justify-content: center;
   gap: 12px;
-  min-height: 60px;
 }
 
 .convert-btn:hover:not(:disabled) {
-  transform: translateY(-3px);
   box-shadow: 0 12px 30px rgba(139, 92, 246, 0.4);
   background: linear-gradient(135deg, #7c3aed, #6d28d9);
 }
@@ -621,15 +527,13 @@ h2 {
 }
 
 .secondary-btn {
-  padding: 20px 30px;
+  padding: 10px 15px;
   background: white;
   border: 2px solid #d1d5db;
   border-radius: 14px;
   color: #6b7280;
-  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
-  min-width: 140px;
   font-size: 16px;
 }
 

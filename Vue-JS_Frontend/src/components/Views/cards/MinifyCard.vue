@@ -122,7 +122,6 @@ const openPopup = () => {
 }
 
 .card:hover {
-    transform: translateY(-5px);
     box-shadow: 0 8px 25px rgba(38, 77, 228, 0.2);
     border-color: #e9ecef;
 }
