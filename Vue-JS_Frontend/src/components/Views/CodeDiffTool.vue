@@ -175,6 +175,18 @@
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue';
 import axios from 'axios';
+function trackToolUsage(toolName, action, extraData = {}) {
+  if (typeof gtag !== 'undefined') {
+    gtag('event', 'tool_used', {
+      'tool_name': toolName,
+      'action': action,
+      'event_category': 'Tools',
+      'event_label': `${toolName} - ${action}`,
+      ...extraData
+    });
+    console.log(`Tracked: ${toolName} - ${action}`);
+  }
+}
 
 const API_BASE_URL = 'http://192.168.18.101:3000/api/code-diff';
 
@@ -356,6 +368,7 @@ const clearCode = () => {
   error.value = '';
   handleOriginalInput();
   handleModifiedInput();
+  trackToolUsage('code_differ', 'clear');
 };
 
 const loadExample = (type) => {
@@ -410,6 +423,7 @@ greet("World");`
     firstChangedLine.value = null;
     handleOriginalInput();
     handleModifiedInput();
+     trackToolUsage('code_differ', 'load_example', { example_type: type });
   }
 };
 
@@ -438,6 +452,13 @@ const compareCode = async () => {
       stats.value = response.data.stats;
       findFirstChangedLine();
       scrollToFirstChange();
+      trackToolUsage('code_differ', 'compare', {
+        original_length: originalCode.value.length,
+        modified_length: modifiedCode.value.length,
+        added_lines: stats.value?.added || 0,
+        removed_lines: stats.value?.removed || 0,
+        change_percentage: stats.value?.changePercentage || 0
+      });
     } else {
       error.value = response.data.error || 'Comparison failed';
     }
@@ -448,6 +469,14 @@ const compareCode = async () => {
     stats.value = localDiff.stats;
     findFirstChangedLine();
     scrollToFirstChange();
+    trackToolUsage('code_differ', 'compare', {
+      original_length: originalCode.value.length,
+      modified_length: modifiedCode.value.length,
+      added_lines: stats.value?.added || 0,
+      removed_lines: stats.value?.removed || 0,
+      change_percentage: stats.value?.changePercentage || 0,
+      method: 'local'
+    });
   } finally {
     loading.value = false;
   }

@@ -745,6 +745,18 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue';
 import axios from 'axios';
+function trackToolUsage(toolName, action, extraData = {}) {
+  if (typeof gtag !== 'undefined') {
+    gtag('event', 'tool_used', {
+      'tool_name': toolName,
+      'action': action,
+      'event_category': 'Tools',
+      'event_label': `${toolName} - ${action}`,
+      ...extraData
+    });
+    console.log(`Tracked: ${toolName} - ${action}`);
+  }
+}
 
 const API_BASE_URL = 'http://192.168.18.101:3000/api/developer';
 
@@ -908,6 +920,13 @@ const copyToClipboard = async (text) => {
     }
     
     showNotification('Copied to clipboard!');
+     if (typeof gtag !== 'undefined') {
+      gtag('event', 'tool_used', {
+        'tool_name': 'developer_tools',
+        'action': 'copy',
+        'event_category': 'Tools',
+        'event_label': 'Copied output'
+      });}
   } catch (err) {
     console.error('Failed to copy:', err);
     alert('Failed to copy to clipboard. Please try again.');
@@ -990,6 +1009,10 @@ const convertJsonToXml = async () => {
 
     if (response.data.success) {
       outputText.value = response.data.xml;
+       trackToolUsage('json_to_xml', 'convert', {
+        input_length: jsonInput.value.length,
+        output_length: outputText.value.length
+      });
     } else {
       error.jsonToXml = response.data.error || 'Conversion failed';
     }
@@ -1018,6 +1041,10 @@ const convertXmlToJson = async () => {
 
     if (response.data.success) {
       outputText.value = response.data.json;
+        trackToolUsage('xml_to_json', 'convert', {
+        input_length: xmlInput.value.length,
+        output_length: outputText.value.length
+      });
     } else {
       error.xmlToJson = response.data.error || 'Conversion failed';
     }
@@ -1046,6 +1073,10 @@ const convertJsonToYaml = async () => {
 
     if (response.data.success) {
       yamlOutput.value = response.data.yaml;
+       trackToolUsage('json_to_yaml', 'convert', {
+        input_length: jsonYamlInput.json.length,
+        output_length: yamlOutput.value.length
+      });
     } else {
       error.jsonToYaml = response.data.error || 'Conversion failed';
     }
@@ -1074,6 +1105,10 @@ const convertYamlToJson = async () => {
 
     if (response.data.success) {
       yamlOutput.value = response.data.json;
+       trackToolUsage('yaml_to_json', 'convert', {
+        input_length: yamlInput.value.length,
+        output_length: yamlOutput.value.length
+      });
     } else {
       error.yamlToJson = response.data.error || 'Conversion failed';
     }
@@ -1104,6 +1139,10 @@ const convertCsvToJson = async () => {
 
     if (response.data.success) {
       csvOutput.value = response.data.json;
+        trackToolUsage('csv_to_json', 'convert', {
+        input_length: csvJsonInput.csv.length,
+        output_length: csvOutput.value.length
+      });
     } else {
       error.csvToJson = response.data.error || 'Conversion failed';
     }
@@ -1133,6 +1172,10 @@ const convertJsonToCsv = async () => {
 
     if (response.data.success) {
       csvOutput.value = response.data.csv;
+        trackToolUsage('json_to_csv', 'convert', {
+        input_length: csvJsonOutput.json.length,
+        output_length: csvOutput.value.length
+      });
     } else {
       error.jsonToCsv = response.data.error || 'Conversion failed';
     }
@@ -1161,6 +1204,10 @@ const convertSqlToMongo = async () => {
 
     if (response.data.success) {
       sqlMongoOutput.mongo = response.data.mongo;
+       trackToolUsage('sql_to_mongo', 'convert', {
+        input_length: sqlMongoInput.sql.length,
+        output_length: sqlMongoOutput.mongo.length
+      });
     } else {
       error.sqlToMongo = response.data.error || 'Conversion failed';
     }
@@ -1188,6 +1235,10 @@ const convertJavaToCSharp = async () => {
 
     if (response.data.success) {
       javaCsharpOutput.csharp = response.data.csharp;
+       trackToolUsage('java_to_csharp', 'convert', {
+        input_length: javaCsharpInput.java.length,
+        output_length: javaCsharpOutput.csharp.length
+      });
     } else {
       error.javaToCSharp = response.data.error || 'Conversion failed';
     }
@@ -1215,6 +1266,10 @@ const convertPythonToJs = async () => {
 
     if (response.data.success) {
       pythonJsOutput.javascript = response.data.javascript;
+       trackToolUsage('python_to_javascript', 'convert', {
+        input_length: pythonJsInput.python.length,
+        output_length: pythonJsOutput.javascript.length
+      });
     } else {
       error.pythonToJs = response.data.error || 'Conversion failed';
     }
@@ -1243,6 +1298,11 @@ const convertCurl = async () => {
 
     if (response.data.success) {
       curlOutput.code = response.data.code;
+       trackToolUsage('curl_converter', 'convert', {
+        input_length: curlInput.curl.length,
+        output_length: curlOutput.code.length,
+        target_type: curlOutput.type
+      });
     } else {
       error.curlConvert = response.data.error || 'Conversion failed';
       curlOutput.code = '';

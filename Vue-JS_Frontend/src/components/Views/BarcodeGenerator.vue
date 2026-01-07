@@ -936,6 +936,18 @@ import axios from 'axios';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 
+function trackToolUsage(toolName, action, extraData = {}) {
+  if (typeof gtag !== 'undefined') {
+    gtag('event', 'tool_used', {
+      'tool_name': toolName,
+      'action': action,
+      'event_category': 'Tools',
+      'event_label': `${toolName} - ${action}`,
+      ...extraData
+    });
+    console.log(`Tracked: ${toolName} - ${action}`);
+  }
+}
 const API_BASE_URL = 'http://192.168.18.101:3000/api/barcode';
 
 // State
@@ -1173,6 +1185,11 @@ const generateSimpleBarcode = async () => {
     if (response.data.success) {
       simpleBarcode.preview = response.data.barcode;
       showNotification('Barcode generated successfully!');
+       trackToolUsage('simple_barcode', 'generate', {
+        type: simpleBarcode.type,
+        text_length: simpleBarcode.text.length
+      });
+
     } else {
       error.simple = response.data.error || 'Failed to generate barcode';
     }
@@ -1218,6 +1235,10 @@ const generateQRCode = async () => {
         if (contactResponse.data.success) {
           qrCode.preview = contactResponse.data.qrcode;
           showNotification('Contact QR code generated successfully!');
+           trackToolUsage('qr_code', 'generate', {
+      qr_type: qrCode.type,
+      content_length: qrContent?.length || 0
+    });
           loading.qr = false;
           return;
         }
@@ -1323,6 +1344,11 @@ const generateProductBarcode = async () => {
     if (response.data.success) {
       productData.preview = response.data.barcode;
       showNotification('Product barcode generated successfully!');
+       trackToolUsage('product_barcode', 'generate', {
+      type: productData.type,
+      has_product_name: !!productData.productName,
+      has_price: !!productData.price
+    });
     } else {
       error.product = response.data.error || 'Failed to generate product barcode';
     }
@@ -1373,6 +1399,10 @@ const generateBatchBarcodes = async () => {
     if (response.data.success) {
       batchData.results = response.data.items.filter(item => item.success);
       showNotification(`Generated ${batchData.results.length} barcodes successfully!`);
+       trackToolUsage('batch_barcode', 'generate', {
+      count: batchData.results.length,
+      type: batchData.type
+    });
     } else {
       error.batch = response.data.error || 'Failed to generate batch barcodes';
     }
@@ -1405,6 +1435,8 @@ const downloadBarcode = (type) => {
   link.click();
   document.body.removeChild(link);
   showNotification('Barcode downloaded!');
+    trackToolUsage(type + '_barcode', 'download');
+
 };
 
 const downloadQRCode = () => {
@@ -1418,6 +1450,8 @@ const downloadQRCode = () => {
   link.click();
   document.body.removeChild(link);
   showNotification('QR code downloaded!');
+    trackToolUsage('qr_code', 'download', { qr_type: qrCode.type });
+
 };
 
 const downloadProductBarcode = () => {

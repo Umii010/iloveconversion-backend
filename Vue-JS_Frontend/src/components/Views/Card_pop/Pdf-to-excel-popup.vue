@@ -1,6 +1,17 @@
 <script setup>
 import { ref, computed } from 'vue'
-
+function trackToolUsage(toolName, action, extraData = {}) {
+  if (typeof gtag !== 'undefined') {
+    gtag('event', 'tool_used', {
+      'tool_name': toolName,
+      'action': action,
+      'event_category': 'Tools',
+      'event_label': `${toolName} - ${action}`,
+      ...extraData
+    });
+    console.log(`Tracked: ${toolName} - ${action}`);
+  }
+}
 const file = ref(null)
 const loading = ref(false)
 const progress = ref(0)
@@ -41,14 +52,23 @@ const selectFile = (e) => {
   if (!selectedFile) return
   
   if (!selectedFile.name.toLowerCase().endsWith('.pdf')) {
+
     alert('Please select a PDF file')
     e.target.value = ''
+     trackToolUsage('pdf_to_excel', 'invalid_file', {
+      file_type: selectedFile.name.split('.').pop(),
+      file_name: selectedFile.name
+    });
     return
   }
   
   file.value = selectedFile
   fileSize.value = (selectedFile.size / (1024 * 1024)).toFixed(1) + ' MB'
   console.log('PDF file selected for Excel conversion:', selectedFile.name)
+   trackToolUsage('pdf_to_excel', 'file_selected', {
+    file_size_mb: parseFloat(fileSize.value),
+    file_name_length: selectedFile.name.length
+  });
 }
 
 const convertPdfToExcel = async () => {
@@ -160,6 +180,14 @@ const convertPdfToExcel = async () => {
 
     progress.value = 100
     statusText.value = `✅ Conversion complete! Downloading...`
+    trackToolUsage('pdf_to_excel', 'convert', {
+      file_size_mb: parseFloat(fileSize.value) || 0,
+      format: conversionSettings.value.format,
+      processing_time: totalTime,
+      file_name_length: file.value.name.length,
+      has_headers: conversionSettings.value.includeHeaders,
+      preserve_formatting: conversionSettings.value.preserveFormatting
+    });
 
     // Show success message with stats
     setTimeout(() => {
@@ -169,6 +197,12 @@ const convertPdfToExcel = async () => {
   } catch (err) {
     statusText.value = '❌ Conversion failed'
     console.error('PDF to Excel error:', err)
+     trackToolUsage('pdf_to_excel', 'convert_error', {
+      error_type: err.message.includes('No tables detected') ? 'no_tables' : 
+                 err.message.includes('timeout') ? 'timeout' : 'other',
+      error_message: err.message.substring(0, 100),
+      file_size_mb: parseFloat(fileSize.value) || 0
+    });
     
     let userMessage = 'Conversion failed: '
     if (err.message.includes('No tables detected')) {

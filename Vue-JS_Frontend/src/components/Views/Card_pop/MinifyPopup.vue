@@ -131,7 +131,18 @@
 
 <script setup>
 import { ref, computed, nextTick } from 'vue'
-
+function trackToolUsage(toolName, action, extraData = {}) {
+  if (typeof gtag !== 'undefined') {
+    gtag('event', 'tool_used', {
+      'tool_name': toolName,
+      'action': action,
+      'event_category': 'Tools',
+      'event_label': `${toolName} - ${action}`,
+      ...extraData
+    });
+    console.log(`Tracked: ${toolName} - ${action}`);
+  }
+}
 const emit = defineEmits(['close'])
 
 // State
@@ -221,6 +232,9 @@ document.getElementById('btn').addEventListener('click', function() {
     console.log('Total: $' + total.toFixed(2));
 });`
   }
+   trackToolUsage('code_minifier', 'load_sample', {
+    language: selectedLanguage.value
+  });
 }
 
 const handleFileUpload = (event) => {
@@ -276,6 +290,13 @@ const processCode = async () => {
       await nextTick()
       if (codeOutput.value) {
         codeOutput.value.scrollIntoView({ behavior: 'smooth' })
+         trackToolUsage('code_minifier', selectedAction.value, {
+        language: selectedLanguage.value,
+        original_size: code.value.length,
+        processed_size: output.value.length,
+        compression_ratio: compressionRatio.value,
+        options_used: selectedAction.value === 'minify' ? Object.keys(minifyOptions.value).filter(k => minifyOptions.value[k]).join(',') : 'none'
+      });
       }
     } else {
       output.value = `Error: ${result.error}`
@@ -295,6 +316,10 @@ const copyToClipboard = async () => {
   try {
     await navigator.clipboard.writeText(output.value)
     copied.value = true
+    trackToolUsage('code_minifier', 'copy_output', {
+      language: selectedLanguage.value,
+      action: selectedAction.value
+    });
     
     setTimeout(() => {
       copied.value = false
@@ -309,6 +334,11 @@ const copyToClipboard = async () => {
     document.execCommand('copy')
     document.body.removeChild(textArea)
     copied.value = true
+    trackToolUsage('code_minifier', 'copy_output', {
+      language: selectedLanguage.value,
+      action: selectedAction.value,
+      method: 'fallback'
+    });
     
     setTimeout(() => {
       copied.value = false
@@ -333,6 +363,11 @@ const downloadCode = () => {
   a.click()
   document.body.removeChild(a)
   URL.revokeObjectURL(url)
+   trackToolUsage('code_minifier', 'download', {
+    language: selectedLanguage.value,
+    action: selectedAction.value,
+    file_type: extension
+  });
 }
 
 // Refs

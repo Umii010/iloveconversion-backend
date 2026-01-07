@@ -845,6 +845,18 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue';
 import axios from 'axios';
+function trackToolUsage(toolName, action, extraData = {}) {
+  if (typeof gtag !== 'undefined') {
+    gtag('event', 'tool_used', {
+      'tool_name': toolName,
+      'action': action,
+      'event_category': 'Tools',
+      'event_label': `${toolName} - ${action}`,
+      ...extraData
+    });
+    console.log(`Tracked: ${toolName} - ${action}`);
+  }
+}
 
 const API_BASE_URL = 'http://192.168.18.101:3000/api/encoder';
 
@@ -1074,6 +1086,7 @@ const loadSample = (type) => {
       asciiInput.ascii = '72 101 108 108 111 32 87 111 114 108 100';
       break;
   }
+   trackToolUsage('encoder_tools', 'load_sample', { sample_type: type });
 };
 
 // Copy to clipboard
@@ -1086,6 +1099,9 @@ const copyToClipboard = async (text) => {
   try {
     await navigator.clipboard.writeText(text);
     showNotification('Copied to clipboard!');
+     trackToolUsage('encoder_tools', 'copy_result', {
+      text_length: text.length
+    });
   } catch (err) {
     console.error('Failed to copy:', err);
     // Fallback for older browsers
@@ -1195,6 +1211,10 @@ const urlEncode = async () => {
     if (response.data.success) {
       urlOutput.result = response.data.encoded;
       urlOutput.operation = 'URL Encoded';
+       trackToolUsage('url_encoder', 'encode', {
+      input_length: urlInput.text.length,
+      output_length: urlOutput.result.length
+    });
     } else {
       error.url = response.data.error || 'Encoding failed';
     }
@@ -1223,6 +1243,10 @@ const urlDecode = async () => {
     if (response.data.success) {
       urlOutput.result = response.data.decoded;
       urlOutput.operation = 'URL Decoded';
+      trackToolUsage('url_encoder', 'decode', {
+      input_length: urlInput.text.length,
+      output_length: urlOutput.result.length
+    });
     } else {
       error.url = response.data.error || 'Decoding failed';
     }
@@ -1253,6 +1277,11 @@ const base64Encode = async () => {
       base64Output.result = response.data.encoded;
       base64Output.operation = 'Base64 Encoded';
       base64Output.format = response.data.isBinary ? 'Binary' : 'Text';
+       trackToolUsage('base64_encoder', 'encode', {
+      is_binary: base64Input.isBinary,
+      input_length: base64Input.text.length,
+      output_length: base64Output.result.length
+    });
     } else {
       error.base64 = response.data.error || 'Encoding failed';
     }
@@ -1283,6 +1312,11 @@ const base64Decode = async () => {
       base64Output.result = response.data.decoded;
       base64Output.operation = 'Base64 Decoded';
       base64Output.format = response.data.outputFormat;
+       trackToolUsage('base64_encoder', 'decode', {
+      output_format: base64Input.outputFormat,
+      input_length: base64Input.text.length,
+      output_length: base64Output.result.length
+    });
     } else {
       error.base64 = response.data.error || 'Decoding failed';
     }
@@ -1312,6 +1346,10 @@ const textToAscii = async () => {
 
     if (response.data.success) {
       asciiOutput.textToAscii = response.data.ascii;
+       trackToolUsage('ascii_converter', 'text_to_ascii', {
+      format: asciiInput.textToAsciiFormat,
+      input_length: asciiInput.text.length
+    });
     } else {
       error.ascii = response.data.error || 'Conversion failed';
     }
@@ -1341,6 +1379,10 @@ const asciiToText = async () => {
 
     if (response.data.success) {
       asciiOutput.asciiToText = response.data.text;
+       trackToolUsage('ascii_converter', 'ascii_to_text', {
+      format: asciiInput.asciiToTextFormat,
+      input_length: asciiInput.ascii.length
+    });
     } else {
       error.ascii = response.data.error || 'Conversion failed';
     }
@@ -1370,6 +1412,12 @@ const htmlEncode = async () => {
     if (response.data.success) {
       htmlOutput.result = response.data.encoded;
       htmlOutput.operation = 'HTML Encoded';
+       trackToolUsage('html_encoder', 'encode', {
+      encode_all: htmlInput.encodeAll,
+      input_length: htmlInput.text.length,
+      output_length: htmlOutput.result.length,
+      html_entities_count: countHtmlEntities(htmlInput.text)
+    });
     } else {
       error.html = response.data.error || 'Encoding failed';
     }
@@ -1398,6 +1446,12 @@ const htmlDecode = async () => {
     if (response.data.success) {
       htmlOutput.result = response.data.decoded;
       htmlOutput.operation = 'HTML Decoded';
+       trackToolUsage('html_encoder', 'decode', {
+      input_length: htmlInput.text.length,
+      output_length: htmlOutput.result.length,
+      html_entities_count: countHtmlEntities(htmlInput.text)
+    });
+
     } else {
       error.html = response.data.error || 'Decoding failed';
     }
@@ -1425,6 +1479,10 @@ const hexEncode = async () => {
 
     if (response.data.success) {
       hexOutput.result = response.data.encoded;
+       trackToolUsage('hex_encoder', 'encode', {
+      input_length: hexInput.text.length,
+      output_length: hexOutput.result.length
+    });
     } else {
       error.hex = response.data.error || 'Encoding failed';
     }
@@ -1452,6 +1510,10 @@ const hexDecode = async () => {
 
     if (response.data.success) {
       hexOutput.result = response.data.decoded;
+      trackToolUsage('hex_encoder', 'decode', {
+      input_length: hexInput.text.length,
+      output_length: hexOutput.result.length
+    });
     } else {
       error.hex = response.data.error || 'Decoding failed';
     }
@@ -1479,6 +1541,10 @@ const binaryEncode = async () => {
 
     if (response.data.success) {
       binaryOutput.result = response.data.encoded;
+      trackToolUsage('binary_encoder', 'encode', {
+      input_length: binaryInput.text.length,
+      output_length: binaryOutput.result.length
+    });
     } else {
       error.binary = response.data.error || 'Encoding failed';
     }
@@ -1507,6 +1573,10 @@ const binaryDecode = async () => {
 
     if (response.data.success) {
       binaryOutput.result = response.data.decoded;
+        trackToolUsage('binary_encoder', 'decode', {
+      input_length: binaryInput.text.length,
+      output_length: binaryOutput.result.length
+    });
     } else {
       error.binary = response.data.error || 'Decoding failed';
     }
@@ -1534,6 +1604,10 @@ const utf8Encode = async () => {
 
     if (response.data.success) {
       utf8Output.result = response.data.encoded;
+       trackToolUsage('utf8_encoder', 'encode', {
+      input_length: utf8Input.text.length,
+      output_length: utf8Output.result.length
+    });
     } else {
       error.utf8 = response.data.error || 'Encoding failed';
     }
@@ -1564,6 +1638,11 @@ const validateEncoding = async () => {
       validatorOutput.result = response.data;
       validatorOutput.valid = response.data.valid;
       validatorOutput.message = response.data.message;
+        trackToolUsage('encoding_validator', 'validate', {
+      encoding_type: validatorInput.encoding,
+      input_length: validatorInput.text.length,
+      is_valid: response.data.valid
+    });
     } else {
       error.validator = response.data.error || 'Validation failed';
     }

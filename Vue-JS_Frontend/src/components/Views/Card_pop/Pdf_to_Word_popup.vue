@@ -1,6 +1,17 @@
 <script setup>
 import { ref, computed } from 'vue'
-
+function trackToolUsage(toolName, action, extraData = {}) {
+  if (typeof gtag !== 'undefined') {
+    gtag('event', 'tool_used', {
+      'tool_name': toolName,
+      'action': action,
+      'event_category': 'Tools',
+      'event_label': `${toolName} - ${action}`,
+      ...extraData
+    });
+    console.log(`Tracked: ${toolName} - ${action}`);
+  }
+}
 const file = ref(null)
 const loading = ref(false)
 const progress = ref(0)
@@ -26,6 +37,11 @@ const selectFile = (e) => {
     fileSize.value = selectedFile.size
     uploadTime.value = new Date()
     statusText.value = `File selected: ${selectedFile.name} (${formattedFileSize.value})`
+       trackToolUsage('pdf_to_word', 'file_selected', {
+      file_name: selectedFile.name,
+      file_size: selectedFile.size,
+      file_type: selectedFile.type
+    });
   }
 }
 
@@ -39,6 +55,11 @@ const pdfToWord = async () => {
   progress.value = 0
   statusText.value = 'Preparing conversion...'
   const startTime = Date.now()
+    trackToolUsage('pdf_to_word', 'convert_start', {
+    file_name: file.value.name,
+    file_size: file.value.size,
+    file_type: file.value.type
+  });
 
   const formData = new FormData()
   formData.append('file', file.value)
@@ -107,20 +128,30 @@ const pdfToWord = async () => {
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
 
-    // Show success popup
     showSuccessPopup.value = true
+      trackToolUsage('pdf_to_word', 'convert_success', {
+      file_name: conversionStats.value.fileName,
+      original_size: file.value.size,
+      converted_size: blob.size,
+      page_count: conversionStats.value.pageCount,
+      time_taken: timeTaken + 's',
+      success: true
+    });
 
-    // Reset after 3 seconds
     setTimeout(() => {
       progress.value = 0
       statusText.value = ''
-      // Don't reset file here - let user see stats
     }, 1000)
 
   } catch (err) {
     console.error(err)
     statusText.value = `Error: ${err.message}`
     alert(`Conversion failed: ${err.message}`)
+     trackToolUsage('pdf_to_word', 'convert_failed', {
+      file_name: file.value?.name || 'unknown',
+      error_message: err.message,
+      success: false
+    });
   } finally {
     loading.value = false
   }

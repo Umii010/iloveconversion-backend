@@ -105,9 +105,10 @@
         
             <div class="result-item">
               <div class="download-link">
-                <a :href="corruptedFileUrl" :download="'CORRUPTED_' + file?.name" class="download-btn">
-                   Download Corrupted File
-                </a>
+               <!-- Change this: -->
+<a :href="corruptedFileUrl" :download="'CORRUPTED_' + file?.name" class="download-btn" @click="trackDownload">
+    Download Corrupted File
+</a>
               </div>
             </div>
             
@@ -119,7 +120,29 @@
 </template>
 
 <script setup>
+  const trackDownload = () => {
+  if (file.value) {
+    trackToolUsage('file_corruptor', 'download', {
+      file_type: file.value.type,
+      file_size: file.value.size,
+      corruption_method: corruptionMethod.value,
+      intensity: intensity.value
+    });
+  }
+}
 import { ref, computed } from 'vue'
+function trackToolUsage(toolName, action, extraData = {}) {
+  if (typeof gtag !== 'undefined') {
+    gtag('event', 'tool_used', {
+      'tool_name': toolName,
+      'action': action,
+      'event_category': 'Tools',
+      'event_label': `${toolName} - ${action}`,
+      ...extraData
+    });
+    console.log(`Tracked: ${toolName} - ${action}`);
+  }
+}
 
 const file = ref(null)
 const loading = ref(false)
@@ -182,6 +205,12 @@ const proceedWithCorruption = async () => {
   loading.value = true
   progress.value = 0
   statusText.value = 'Initializing corruption...'
+  trackToolUsage('file_corruptor', 'upload', {
+    file_type: file.value.type,
+    file_size: file.value.size,
+    corruption_method: corruptionMethod.value,
+    intensity: intensity.value
+  });
 
   const formData = new FormData()
   formData.append('file', file.value)
@@ -212,6 +241,13 @@ const proceedWithCorruption = async () => {
 
     const blob = await res.blob()
     corruptedFileUrl.value = URL.createObjectURL(blob)
+     trackToolUsage('file_corruptor', 'corrupt_success', {
+      file_type: file.value.type,
+      file_size: file.value.size,
+      corruption_method: corruptionMethod.value,
+      intensity: intensity.value,
+      result_size: blob.size
+    });
 
     setTimeout(() => {
       showSuccess.value = true
@@ -222,6 +258,10 @@ const proceedWithCorruption = async () => {
     console.error('Corruption error:', err)
     statusText.value = `Error: ${err.message}`
     loading.value = false
+     trackToolUsage('file_corruptor', 'corrupt_failed', {
+      file_type: file.value.type,
+      error_message: err.message.substring(0, 50)
+    });
   }
 }
 
@@ -232,6 +272,25 @@ const getStatusMessage = (progress) => {
   if (progress < 90) return 'Finalizing damage...'
   return 'Corruption complete!'
 }
+const downloadCorruptedFile = () => {
+  if (!corruptedFileUrl.value) return;
+  
+  const link = document.createElement('a');
+  link.href = corruptedFileUrl.value;
+  const originalName = file.value.name;
+  const extension = originalName.split('.').pop();
+  link.download = `corrupted_${Date.now()}.${extension}`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  
+  trackToolUsage('file_corruptor', 'download', {
+    file_type: file.value.type,
+    file_size: file.value.size
+  });
+  
+  showSuccess.value = true;
+};
 
 const closeSuccess = () => {
   showSuccess.value = false

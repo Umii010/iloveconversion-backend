@@ -1,6 +1,17 @@
 <script setup>
 import { ref, computed } from 'vue'
-
+function trackToolUsage(toolName, action, extraData = {}) {
+  if (typeof gtag !== 'undefined') {
+    gtag('event', 'tool_used', {
+      'tool_name': toolName,
+      'action': action,
+      'event_category': 'Tools',
+      'event_label': `${toolName} - ${action}`,
+      ...extraData
+    });
+    console.log(`Tracked: ${toolName} - ${action}`);
+  }
+}
 const files = ref([])
 const loading = ref(false)
 const progress = ref(0)
@@ -44,6 +55,10 @@ const selectFiles = (e) => {
     files.value = [...files.value, ...pdfFiles]
     uploadTime.value = new Date()
     statusText.value = `Added ${pdfFiles.length} PDF file(s)`
+    trackToolUsage('pdf_merger', 'add_files', {
+      file_count: pdfFiles.length,
+      total_added: files.value.length
+    });
   }
 }
 
@@ -161,8 +176,14 @@ const mergePdf = async () => {
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
 
-    // Show success popup
     showSuccessPopup.value = true
+     trackToolUsage('pdf_merger', 'merge', {
+      file_count: files.value.length,
+      total_size_mb: (totalFileSize.value / (1024 * 1024)).toFixed(2),
+      merge_time_seconds: timeTaken,
+      total_pages: parseInt(totalPages) || 0,
+      success: true
+    });
 
     // Reset progress after download
     setTimeout(() => {
@@ -174,6 +195,12 @@ const mergePdf = async () => {
     console.error(err)
     statusText.value = `Error: ${err.message}`
     alert(`Merge failed: ${err.message}`)
+     trackToolUsage('pdf_merger', 'merge', {
+      file_count: files.value.length,
+      total_size_mb: (totalFileSize.value / (1024 * 1024)).toFixed(2),
+      error: err.message.substring(0, 100),
+      success: false
+    });
   } finally {
     loading.value = false
   }
@@ -181,7 +208,13 @@ const mergePdf = async () => {
 
 const closePopup = () => {
   showSuccessPopup.value = false
-  // Reset files after viewing stats
+   if (mergeStats.value) {
+    trackToolUsage('pdf_merger', 'view_stats', {
+      file_count: mergeStats.value.fileCount,
+      total_pages: mergeStats.value.totalPages,
+      time_taken: mergeStats.value.timeTaken
+    });
+  }
   files.value = []
   const input = document.querySelector('input[type="file"]')
   if (input) input.value = ''
@@ -208,6 +241,10 @@ const handleDrop = (e) => {
     files.value = [...files.value, ...pdfFiles]
     uploadTime.value = new Date()
     statusText.value = `Added ${pdfFiles.length} PDF file(s) via drag & drop`
+     trackToolUsage('pdf_merger', 'drag_drop_files', {
+      file_count: pdfFiles.length,
+      method: 'drag_drop'
+    });
   } else if (droppedFiles.length > 0) {
     alert('Only PDF files are supported for merging.')
   }

@@ -1,6 +1,17 @@
 <script setup>
 import { ref, computed } from 'vue'
-
+function trackToolUsage(toolName, action, extraData = {}) {
+  if (typeof gtag !== 'undefined') {
+    gtag('event', 'tool_used', {
+      'tool_name': toolName,
+      'action': action,
+      'event_category': 'Tools',
+      'event_label': `${toolName} - ${action}`,
+      ...extraData
+    });
+    console.log(`Tracked: ${toolName} - ${action}`);
+  }
+}
 const files = ref([])
 const loading = ref(false)
 const progress = ref(0)
@@ -86,11 +97,20 @@ const selectFiles = (e) => {
       files.value = [...files.value, ...supportedFiles]
       uploadTime.value = new Date()
       statusText.value = `Added ${supportedFiles.length} image(s)`
+        trackToolUsage('image_to_pdf', 'upload_files', {
+        file_count: supportedFiles.length,
+        total_size: supportedFiles.reduce((sum, f) => sum + f.size, 0),
+        unsupported_count: unsupportedFiles.length
+      });
     }
   } else {
     files.value = [...files.value, ...selectedFiles]
     uploadTime.value = new Date()
     statusText.value = `Added ${selectedFiles.length} image(s)`
+      trackToolUsage('image_to_pdf', 'upload_files', {
+      file_count: selectedFiles.length,
+      total_size: selectedFiles.reduce((sum, f) => sum + f.size, 0)
+    });
   }
 }
 
@@ -198,6 +218,14 @@ const imagesToPdf = async () => {
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
+    trackToolUsage('image_to_pdf', 'convert', {
+      file_count: files.value.length,
+      total_size: totalFileSize.value,
+      pdf_size: pdfSize,
+      compression_ratio: parseFloat(compressionRatio),
+      time_taken: timeTaken + 's',
+      avg_file_size: avgImageSize
+    });
 
     // Show success popup
     setTimeout(() => {
@@ -214,6 +242,14 @@ const imagesToPdf = async () => {
     console.error('Conversion error:', err)
     statusText.value = `Error: ${err.message}`
     alert(`Conversion failed: ${err.message}`)
+     if (typeof gtag !== 'undefined') {
+      gtag('event', 'tool_error', {
+        'tool_name': 'image_to_pdf',
+        'action': 'convert',
+        'error_message': err.message,
+        'file_count': files.value.length
+      });
+    }
   } finally {
     loading.value = false
   }

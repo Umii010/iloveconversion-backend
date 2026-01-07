@@ -185,6 +185,35 @@ const preferences = reactive({
   advertising: false
 });
 
+// 🔴 Function to update Google Consent Mode
+function updateGoogleConsent() {
+  if (window.gtag) {
+    window.gtag('consent', 'update', {
+      'ad_storage': preferences.advertising ? 'granted' : 'denied',
+      'analytics_storage': preferences.analytics ? 'granted' : 'denied',
+      'ad_user_data': preferences.advertising ? 'granted' : 'denied',
+      'ad_personalization': preferences.advertising ? 'granted' : 'denied'
+    });
+    
+    console.log('✅ Google Consent Mode updated:', {
+      analytics: preferences.analytics ? 'granted' : 'denied',
+      advertising: preferences.advertising ? 'granted' : 'denied'
+    });
+  }
+}
+
+// 🔴 Function to send event to Google Analytics
+function trackGAEvent(eventName, eventParams = {}) {
+  if (window.gtag && preferences.analytics) {
+    window.gtag('event', eventName, {
+      'event_category': 'Cookie Consent',
+      'event_label': eventName,
+      ...eventParams
+    });
+    console.log(`📊 GA Event: ${eventName}`, eventParams);
+  }
+}
+
 onMounted(() => {
   const saved = Cookies.get("cookieConsent");
   if (saved) {
@@ -192,9 +221,16 @@ onMounted(() => {
       const parsed = JSON.parse(saved);
       consentGiven.value = true;
       Object.assign(preferences, parsed.preferences);
+      
+      // 🔴 Update Google Consent Mode with saved preferences
+      updateGoogleConsent();
+      
       if (parsed.timestamp) {
         console.log("Consent given on:", new Date(parsed.timestamp).toLocaleDateString());
       }
+      
+      // Track that consent was loaded from cookie
+      trackGAEvent('consent_loaded_from_cookie');
     } catch (e) {
       console.error("Error parsing cookie consent:", e);
     }
@@ -206,23 +242,30 @@ watch(preferences, () => {
 }, { deep: true });
 
 function acceptAllCookies() {
+  console.log("✅ Accept All clicked");
   preferences.analytics = true;
   preferences.advertising = true;
   saveConsent();
 }
 
 function savePreferences() {
-  if (!hasInteracted.value) return;
+  if (!hasInteracted.value) {
+    console.log("⚠️ No preferences changed");
+    return;
+  }
   saveConsent();
 }
 
 function saveConsent() {
+  console.log("💾 Saving consent...");
+  
   const consentData = {
     timestamp: new Date().toISOString(),
     version: "1.0",
     preferences: { ...preferences }
   };
   
+  // Save to cookie
   Cookies.set("cookieConsent", JSON.stringify(consentData), { 
     expires: 365, 
     path: '/',
@@ -232,22 +275,64 @@ function saveConsent() {
   
   consentGiven.value = true;
   expanded.value = false;
-
-  if (preferences.analytics) loadAnalytics();
-  if (preferences.advertising) loadAds();
+  
+  // 🔴 1. Update Google Consent Mode FIRST
+  updateGoogleConsent();
+  
+  // 🔴 2. Track the consent event in GA
+  trackGAEvent('consent_saved', {
+    analytics_accepted: preferences.analytics,
+    advertising_accepted: preferences.advertising
+  });
+  
+  // 🔴 3. If analytics accepted, track page view
+  if (preferences.analytics && window.gtag) {
+    window.gtag('event', 'page_view', {
+      page_title: document.title,
+      page_location: window.location.href,
+      page_path: window.location.pathname
+    });
+  }
+  
+  // 🔴 4. Load advertising if accepted
+  if (preferences.advertising) {
+    loadAds();
+  }
+  
+  console.log("✅ Consent saved successfully!");
 }
 
 function closeBanner() {
   userClosed.value = true;
   Cookies.set("cookieBannerClosed", "true", { expires: 7 });
-}
-
-function loadAnalytics() {
-  console.log("Loading analytics scripts...");
+  
+  // Track banner closed without consent
+  trackGAEvent('banner_closed_without_consent');
 }
 
 function loadAds() {
-  console.log("Loading advertising scripts...");
+  console.log("📢 Loading advertising scripts...");
+  // Add your advertising scripts here (Google Ads, Facebook Pixel, etc.)
+}
+
+// 🔴 Export this function so other components can track tool usage
+function trackToolUsage(toolName, action = 'use', metadata = {}) {
+  if (window.gtag && preferences.analytics) {
+    window.gtag('event', 'tool_used', {
+      'tool_name': toolName,
+      'action': action,
+      'event_category': 'Tools',
+      'event_label': `${toolName} - ${action}`,
+      ...metadata
+    });
+    
+    console.log(`🛠️ Tool tracked: ${toolName} - ${action}`, metadata);
+  }
+}
+
+// 🔴 Make functions available globally (optional)
+if (typeof window !== 'undefined') {
+  window.trackToolUsage = trackToolUsage;
 }
 </script>
 

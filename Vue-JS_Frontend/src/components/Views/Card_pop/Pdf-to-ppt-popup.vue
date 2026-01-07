@@ -1,6 +1,17 @@
 <script setup>
 import { ref, computed } from 'vue'
-
+function trackToolUsage(toolName, action, extraData = {}) {
+  if (typeof gtag !== 'undefined') {
+    gtag('event', 'tool_used', {
+      'tool_name': toolName,
+      'action': action,
+      'event_category': 'Tools',
+      'event_label': `${toolName} - ${action}`,
+      ...extraData
+    });
+    console.log(`Tracked: ${toolName} - ${action}`);
+  }
+}
 const file = ref(null)
 const loading = ref(false)
 const progress = ref(0)
@@ -124,10 +135,21 @@ const convertPdfToPpt = async () => {
       `✓ High quality maintained`,
       'success'
     )
+     trackToolUsage('pdf_to_ppt', 'convert', {
+      file_size: file.value.size,
+      quality: conversionSettings.value.imageQuality,
+      aspect_ratio: conversionSettings.value.aspectRatio,
+      dpi: conversionSettings.value.dpi,
+      conversion_time: elapsedTime
+    });
 
   } catch (err) {
     console.error('Conversion error:', err)
     showNotification(`❌ ${err.message}`, 'error')
+     trackToolUsage('pdf_to_ppt', 'convert_error', {
+      error_message: err.message.substring(0, 100),
+      file_size: file.value?.size || 0
+    });
   } finally {
     if (fakeProgress) clearInterval(fakeProgress)
     loading.value = false
@@ -142,7 +164,9 @@ const showNotification = (message, type = 'success') => {
   popupMessage.value = message
   popupType.value = type
   showPopup.value = true
-  
+   if (type === 'success' && message.includes('Conversion successful')) {
+    trackToolUsage('pdf_to_ppt', 'download');
+  }
   setTimeout(() => {
     showPopup.value = false
   }, 6000)
@@ -155,12 +179,16 @@ const closePopup = () => {
 const selectAspectRatio = (ratio) => {
   conversionSettings.value.aspectRatio = ratio
   showNotification(`Aspect ratio set to: ${aspectRatioOptions.find(r => r.id === ratio)?.name}`, 'info')
+    trackToolUsage('pdf_to_ppt', 'set_aspect_ratio', { aspect_ratio: ratio });
+
 }
 
 const selectQuality = (quality) => {
   conversionSettings.value.imageQuality = quality.id
   conversionSettings.value.dpi = quality.dpi
   showNotification(`Quality set to: ${quality.name} (${quality.dpi} DPI)`, 'info')
+    trackToolUsage('pdf_to_ppt', 'set_quality', { quality: quality.id, dpi: quality.dpi });
+
 }
 
 const updateStatusText = (progressValue) => {
