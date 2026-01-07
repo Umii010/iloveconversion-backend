@@ -21,7 +21,10 @@ const closeMenu = () => {
     <header class="app-header">
         <div class="header__section">
             <div class="site__logo">
-                <img src="../assets/images/logo-converter.png" alt="Logo" class="app-logo" />
+               <a href="/">
+  <img src="../assets/images/logo-converter.png" alt="Logo" class="app-logo" />
+</a>
+
             </div>
             <div class="mobile_menu__section">
                 <button
@@ -46,7 +49,7 @@ const closeMenu = () => {
                     <li>
                         <router-link to="/" class="menu-item" @click="closeMenu">
                             <span class="icon">
-                                <img src="@/assets/images/icons8-home-24.gif" class="menu-icon" />
+                                <img src="@/assets/images/icons8-home-24.gif" alt="home" class="menu-icon" />
                             </span>
                             Home
                         </router-link>
@@ -55,7 +58,7 @@ const closeMenu = () => {
                     <li class="has-submenu">
                         <div class="menu-item submenu-trigger" @click="toggleServices">
                             <span class="icon">
-                                <img src="@/assets/images/icons8-service-50.gif" class="menu-icon" />
+                                <img src="@/assets/images/icons8-service-50.gif" alt="services" class="menu-icon" />
                             </span>
                             Services
                             <span class="submenu-arrow">{{ isServicesOpen ? '▲' : '▼' }}</span>
@@ -63,25 +66,25 @@ const closeMenu = () => {
                         <ul class="submenu" :class="{ open: isServicesOpen }">
                             <li>
                                 <router-link to="/developer-tools" class="submenu-item" @click="closeMenu">
-                                    <span class="submenu-icon">⚙️</span>
+                                    <span class="submenu-icon" alt="tools">⚙️</span>
                                     Developer Tools
                                 </router-link>
                             </li>
                             <li>
                                 <router-link to="/code-difference" class="submenu-item" @click="closeMenu">
-                                    <span class="submenu-icon">📄</span>
+                                    <span class="submenu-icon" alt="codediff">📄</span>
                                     Code Diff
                                 </router-link>
                             </li>
                             <li>
                                 <router-link to="/encoding-tools" class="submenu-item" @click="closeMenu">
-                                    <span class="submenu-icon">{} </span>
+                                    <span class="submenu-icon" alt="encoding">{} </span>
                                     Encoding Tools
                                 </router-link>
                             </li>
                             <li>
                                 <router-link to="/tool-analytics" class="submenu-item" @click="closeMenu">
-                                    <span class="submenu-icon">🔤</span>
+                                    <span class="submenu-icon" alt="analytics">🔤</span>
                                     Tool Analytics
                                 </router-link>
                             </li>
@@ -96,7 +99,7 @@ const closeMenu = () => {
 
                     <li>
                         <router-link to="/barcode-generator" class="menu-item" @click="closeMenu">
-                           <span class="icon">🔍</span> 
+                           <span class="icon" alt="barcode">🔍</span> 
                                     Barcode Generator
                         </router-link>
                     </li>
@@ -109,7 +112,7 @@ const closeMenu = () => {
                     <li>
                         <router-link to="/" class="menu-item">
                             <span class="icon">
-                                <img src="@/assets/images/icons8-home-24.gif" class="menu-icon" />
+                                <img src="@/assets/images/icons8-home-24.gif" alt="home" class="menu-icon" />
                             </span>
                             Home
                         </router-link>
@@ -118,7 +121,7 @@ const closeMenu = () => {
                     <li class="has-submenu desktop">
                         <div class="menu-item submenu-trigger">
                             <span class="icon">
-                                <img src="@/assets/images/icons8-service-50.gif" class="menu-icon" />
+                                <img src="@/assets/images/icons8-service-50.gif" alt="services" class="menu-icon" />
                             </span>
                             Services
                             <span class="submenu-arrow">▼</span>
@@ -126,25 +129,25 @@ const closeMenu = () => {
                         <ul class="submenu desktop-submenu">
                             <li>
                                 <router-link to="/developer-tools" class="submenu-item">
-                                    <span class="submenu-icon">⚙️</span>
+                                    <span class="submenu-icon" alt="developer">⚙️</span>
                                     Developer Tools
                                 </router-link>
                             </li>
                             <li>
                                 <router-link to="/code-difference" class="submenu-item">
-                                    <span class="submenu-icon">📄</span>
+                                    <span class="submenu-icon" alt="codediff">📄</span>
                                     Code Diff
                                 </router-link>
                             </li>
                             <li>
                                <router-link to="/encoding-tools" class="submenu-item" @click="closeMenu">
-                                    <span class="submenu-icon">{} </span>
+                                    <span class="submenu-icon" alt="encoding">{} </span>
                                     Encoding Tools
                                 </router-link>
                             </li>
                             <li>
                                   <router-link to="/tool-analytics" class="submenu-item" @click="closeMenu">
-                                    <span class="submenu-icon">🔤</span>
+                                    <span class="submenu-icon" alt="tools">🔤</span>
                                     Tool Analytics
                                 </router-link>
                             </li>
@@ -159,7 +162,7 @@ const closeMenu = () => {
 
                     <li>
                        <router-link to="/barcode-generator" class="menu-item" @click="closeMenu">
-                           <span class="icon">🔍</span> 
+                           <span class="icon" alt="barcode">🔍</span> 
                                     Barcode Generator
                         </router-link>
                     </li>

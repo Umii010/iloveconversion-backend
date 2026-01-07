@@ -41,6 +41,7 @@
     "prettier": "^3.7.4",
     "puppeteer": "^24.34.0",
     "qrcode": "^1.5.4",
+    "sitemap": "^9.0.0",
     "uglify-js": "^3.19.3",
     "uuid": "^13.0.0",
     "xml2js": "^0.6.2"
