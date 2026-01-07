@@ -171,7 +171,6 @@
 </template>
 
 <script setup>
-    
 import { ref, reactive, onMounted, watch } from "vue";
 import Cookies from "js-cookie";
 
@@ -193,9 +192,8 @@ onMounted(() => {
       const parsed = JSON.parse(saved);
       consentGiven.value = true;
       Object.assign(preferences, parsed.preferences);
-      
-      if (parsed.preferences?.analytics || parsed.preferences?.advertising) {
-        sendConsentToBackend(parsed);
+      if (parsed.timestamp) {
+        console.log("Consent given on:", new Date(parsed.timestamp).toLocaleDateString());
       }
     } catch (e) {
       console.error("Error parsing cookie consent:", e);
@@ -208,28 +206,21 @@ watch(preferences, () => {
 }, { deep: true });
 
 function acceptAllCookies() {
-  console.log("Accept All clicked");
   preferences.analytics = true;
   preferences.advertising = true;
-  saveConsent(); 
+  saveConsent();
 }
 
 function savePreferences() {
-  if (!hasInteracted.value) {
-    console.log("⚠️ No preferences changed, not saving");
-    return;
-  }
+  if (!hasInteracted.value) return;
   saveConsent();
 }
 
 function saveConsent() {
-  console.log("Saving consent...", preferences);
-  
   const consentData = {
     timestamp: new Date().toISOString(),
     version: "1.0",
-    preferences: { ...preferences },
-    consentId: generateConsentId()
+    preferences: { ...preferences }
   };
   
   Cookies.set("cookieConsent", JSON.stringify(consentData), { 
@@ -242,65 +233,21 @@ function saveConsent() {
   consentGiven.value = true;
   expanded.value = false;
 
-  if (preferences.analytics || preferences.advertising) {
-    console.log("📡 Sending consent to backend...");
-    sendConsentToBackend(consentData);
-  }
   if (preferences.analytics) loadAnalytics();
   if (preferences.advertising) loadAds();
-  
-  console.log("Consent saved successfully!");
-}
-
-function sendConsentToBackend(consentData) {
-  const apiUrl = 'http://192.168.18.101:3000/api/consent';
-  
-  console.log("Sending to:", apiUrl);
-  console.log("Payload:", {
-    consent: consentData,
-    user_id: Cookies.get('user_id')
-  });
-  
-  fetch(apiUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include', 
-    body: JSON.stringify({
-      consent: consentData,
-      user_id: Cookies.get('user_id')
-    })
-  })
-  .then(response => {
-    console.log(" Response status:", response.status);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    return response.json();
-  })
-  .then(data => {
-    console.log('Consent tracked successfully:', data);
-  })
-  .catch(err => {
-    console.error('Failed to send consent:', err);
-  });
-}
-
-function generateConsentId() {
-  return 'consent_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 }
 
 function closeBanner() {
   userClosed.value = true;
+  Cookies.set("cookieBannerClosed", "true", { expires: 7 });
 }
 
 function loadAnalytics() {
-  console.log("📊 Loading analytics scripts...");
+  console.log("Loading analytics scripts...");
 }
 
 function loadAds() {
-  console.log("📢 Loading advertising scripts...");
+  console.log("Loading advertising scripts...");
 }
 </script>
 
