@@ -1,5 +1,17 @@
 <script setup>
 import { ref } from 'vue'
+function trackToolUsage(toolName, action, extraData = {}) {
+  if (typeof gtag !== 'undefined') {
+    gtag('event', 'tool_used', {
+      'tool_name': toolName,
+      'action': action,
+      'event_category': 'Tools',
+      'event_label': `${toolName} - ${action}`,
+      ...extraData
+    });
+    console.log(`Tracked: ${toolName} - ${action}`);
+  }
+}
 
 const file = ref(null)
 const loading = ref(false)
@@ -47,8 +59,15 @@ const selectFile = (e) => {
 const performOcr = async () => {
   if (!file.value) {
     alert('Please select a PDF or image file')
+
     return
   }
+  trackToolUsage('ocr_tool', 'start_processing', {
+    language: selectedLanguage.value,
+    output_format: outputFormat.value,
+    file_type: file.value.type,
+    file_size: file.value.size
+  });
 
   loading.value = true
   progress.value = 0
@@ -98,6 +117,12 @@ const performOcr = async () => {
         extractedText.value = result.text
         showTextPreview.value = true
         statusText.value = 'Text extracted successfully!'
+         trackToolUsage('ocr_tool', 'text_extracted', {
+          language: selectedLanguage.value,
+          output_format: outputFormat.value,
+          text_length: result.text.length,
+          has_download_url: !!result.downloadUrl
+        });
         
         // Also offer download if there's a file URL
         if (result.downloadUrl) {
@@ -125,12 +150,24 @@ const performOcr = async () => {
       
       const blob = await res.blob()
       downloadBlob(blob, fileName)
+       trackToolUsage('ocr_tool', 'file_downloaded', {
+        language: selectedLanguage.value,
+        output_format: outputFormat.value,
+        file_type: contentType,
+        file_size: blob.size
+      });
     }
 
   } catch (err) {
     statusText.value = 'OCR failed'
     alert('OCR failed: ' + err.message)
     console.error('OCR error:', err)
+    trackToolUsage('ocr_tool', 'failed', {
+      error: err.message.substring(0, 100),
+      language: selectedLanguage.value,
+      output_format: outputFormat.value
+    });
+
   } finally {
     if (fakeProgress) clearInterval(fakeProgress)
     loading.value = false
@@ -179,6 +216,9 @@ const copyTextToClipboard = async () => {
   try {
     await navigator.clipboard.writeText(extractedText.value)
     alert('Text copied to clipboard!')
+     trackToolUsage('ocr_tool', 'copy_text', {
+      text_length: extractedText.value.length
+    });
   } catch (err) {
     console.error('Failed to copy text:', err)
     // Fallback for older browsers
@@ -189,6 +229,9 @@ const copyTextToClipboard = async () => {
     document.execCommand('copy')
     document.body.removeChild(textArea)
     alert('Text copied to clipboard!')
+      trackToolUsage('ocr_tool', 'copy_text_fallback', {
+      text_length: extractedText.value.length
+    });
   }
 }
 
@@ -202,6 +245,9 @@ const downloadText = () => {
   a.click()
   document.body.removeChild(a)
   URL.revokeObjectURL(url)
+   trackToolUsage('ocr_tool', 'download_text', {
+    text_length: extractedText.value.length
+  });
 }
 
 const clearFile = () => {

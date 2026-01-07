@@ -1,6 +1,17 @@
 <script setup>
 import { ref, computed } from 'vue'
-
+function trackToolUsage(toolName, action, extraData = {}) {
+  if (typeof gtag !== 'undefined') {
+    gtag('event', 'tool_used', {
+      'tool_name': toolName,
+      'action': action,
+      'event_category': 'Tools',
+      'event_label': `${toolName} - ${action}`,
+      ...extraData
+    });
+    console.log(`Tracked: ${toolName} - ${action}`);
+  }
+}
 const file = ref(null)
 const password = ref('')
 const confirmPassword = ref('')
@@ -16,6 +27,13 @@ const selectFile = (e) => {
   file.value = e.target.files[0]
   password.value = ''
   confirmPassword.value = ''
+  if (file.value) {
+    trackToolUsage('pdf_protector', 'file_selected', {
+      file_name: file.value.name,
+      file_size: file.value.size,
+      file_type: file.value.type
+    });
+  }
 }
 
 const openPasswordPopup = () => {
@@ -121,11 +139,20 @@ const protectPdf = async () => {
     // Show success popup
     showSuccessPopup.value = true
     statusText.value = 'PDF protected successfully'
+     trackToolUsage('pdf_protector', 'protect', {
+      file_name: file.value.name,
+      file_size: file.value.size,
+      has_password: !!password.value
+    });
 
   } catch (err) {
     console.error(err)
     statusText.value = 'Protection failed'
     alert('Protection failed. Please try again.')
+    trackToolUsage('pdf_protector', 'protect_failed', {
+      file_name: file.value?.name,
+      error: err.message
+    });
   } finally {
     clearInterval(fakeProgress)
     setTimeout(() => {

@@ -1,5 +1,17 @@
 <script setup>
 import { ref, computed } from 'vue'
+function trackToolUsage(toolName, action, extraData = {}) {
+  if (typeof gtag !== 'undefined') {
+    gtag('event', 'tool_used', {
+      'tool_name': toolName,
+      'action': action,
+      'event_category': 'Tools',
+      'event_label': `${toolName} - ${action}`,
+      ...extraData
+    });
+    console.log(`Tracked: ${toolName} - ${action}`);
+  }
+}
 
 const file = ref(null)
 const loading = ref(false)
@@ -103,6 +115,10 @@ const selectFile = (e) => {
         `Filename contains special characters that may cause issues: ${problemChars}<br><br>` +
         `Please rename the file to remove these characters before uploading.`
       )
+      trackToolUsage('pdf_compressor', 'problematic_file', {
+        file_name: selectedFile.name,
+        problematic_chars: problemChars
+      });
       return
     }
     
@@ -140,6 +156,11 @@ const compressPdf = async () => {
     showError('Please select a PDF file')
     return
   }
+   trackToolUsage('pdf_compressor', 'compress_start', {
+    file_name: file.value.name,
+    file_size: file.value.size,
+    file_type: file.value.type
+  });
 
   // Double-check filename before processing
   if (hasProblematicCharacters(file.value.name)) {
@@ -251,6 +272,13 @@ const compressPdf = async () => {
 
     progress.value = 100
     statusText.value = 'Compression complete! Downloading...'
+     trackToolUsage('pdf_compressor', 'compress_success', {
+      original_size: originalSize,
+      compressed_size: compressedSize,
+      reduction_percent: calculatedPercent,
+      time_taken: timeTaken,
+      compression_ratio: compressionStats.value.compressionRatio
+    });
 
     // Get blob and download
     const blob = await res.blob()
@@ -263,6 +291,10 @@ const compressPdf = async () => {
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
+     trackToolUsage('pdf_compressor', 'download', {
+      compressed_size: compressedSize,
+      reduction_percent: calculatedPercent
+    });
 
     // Show success popup
     setTimeout(() => {
@@ -278,6 +310,10 @@ const compressPdf = async () => {
   } catch (err) {
     console.error('Compression error:', err)
     statusText.value = `Error: ${err.message}`
+    trackToolUsage('pdf_compressor', 'compress_error', {
+      error_type: err.message.includes('GhostScript') ? 'ghostscript_error' : 'server_error',
+      error_message: err.message.substring(0, 100)
+    });
     
     // Check for GhostScript specific errors
     if (err.message.includes('undefinedfilename') || 

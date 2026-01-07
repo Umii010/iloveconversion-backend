@@ -1,6 +1,17 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-
+function trackToolUsage(toolName, action, extraData = {}) {
+  if (typeof gtag !== 'undefined') {
+    gtag('event', 'tool_used', {
+      'tool_name': toolName,
+      'action': action,
+      'event_category': 'Tools',
+      'event_label': `${toolName} - ${action}`,
+      ...extraData
+    });
+    console.log(`Tracked: ${toolName} - ${action}`);
+  }
+}
 const file = ref(null)
 const loading = ref(false)
 const progress = ref(0)
@@ -52,6 +63,10 @@ const selectFile = (e) => {
   detectedIssues.value = []
   repairStatus.value = 'idle'
   actualRepairData.value = null
+   trackToolUsage('pdf_repair', 'file_selected', {
+    file_size: selectedFile.size,
+    file_type: selectedFile.type
+  });
   
   // Auto-start scanning for small files
   if (selectedFile.size < 10 * 1024 * 1024) { // 10MB
@@ -72,6 +87,9 @@ const startScan = () => {
   statusText.value = 'Scanning PDF file for issues...'
   loading.value = true
   progress.value = 0
+  trackToolUsage('pdf_repair', 'scan_started', {
+    file_size: file.value.size
+  });
 
   // Simulate scanning process
   const scanInterval = setInterval(() => {
@@ -128,6 +146,11 @@ const completeScan = () => {
 
   loading.value = false
   progress.value = 0
+  trackToolUsage('pdf_repair', 'scan_completed', {
+    issues_found: issues.length,
+    repair_confidence: repairScore,
+    high_severity_issues: issues.filter(i => i.severity === 'high').length
+  });
 }
 
 const getIssueDetails = (issueId) => {
@@ -188,6 +211,10 @@ const repairPdf = async () => {
   loading.value = true
   progress.value = 0
   statusText.value = 'Starting repair process...'
+  trackToolUsage('pdf_repair', 'repair_started', {
+    issues_count: detectedIssues.value.length,
+    repair_mode: repairMode.value
+  });
 
   // Prepare repair data
   const repairData = {
@@ -277,8 +304,15 @@ const repairPdf = async () => {
                          blob.size < 2000;
 
     if (isActuallyRepaired && !isErrorReport) {
+
       repairStatus.value = 'completed'
       statusText.value = '✅ Repair completed successfully!'
+       trackToolUsage('pdf_repair', 'repair_successful', {
+        pages_recovered: actualRepairData.value?.pages_recovered || 0,
+        issues_fixed: actualRepairData.value?.issues_fixed?.length || detectedIssues.value.length,
+        original_size: file.value.size,
+        new_size: blob.size
+      });
       
       // Show success notification
       showNotification(
@@ -298,8 +332,12 @@ const repairPdf = async () => {
         scanResults.value.actualRepairData = actualRepairData.value
       }
     } else {
-      repairStatus.value = 'analyzing' // Go back to analysis stage
+      repairStatus.value = 'analyzing' 
       statusText.value = '⚠️ Repair partially completed'
+       trackToolUsage('pdf_repair', 'repair_failed', {
+        reason: 'severe_corruption_or_encryption',
+        issues_count: detectedIssues.value.length
+      });
       
       // Show warning notification
       showNotification(
@@ -371,6 +409,7 @@ const resetRepair = () => {
     actualRepairData.value = null
     const input = document.querySelector('input[type="file"]')
     if (input) input.value = ''
+    trackToolUsage('pdf_repair', 'reset');
   }
 }
 

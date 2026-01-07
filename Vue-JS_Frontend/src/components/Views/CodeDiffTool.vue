@@ -9,7 +9,7 @@
           </p>
         </div>
         <div class="header-actions">
-          <button class="action-button" @click="toggleTheme">
+          <button class="action-button" aria-label="moon" @click="toggleTheme">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-2.98 0-5.4-2.42-5.4-5.4 0-1.81.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z"/>
             </svg>
@@ -43,7 +43,7 @@
       <div class="editors-section">
         <div class="editor-container">
           <div class="editor-header">
-            <h3 class="editor-title">Original Code</h3>
+            <h4 class="editor-title">Original Code</h4>
             <div class="diff-indicator">
               <span class="removed-marker">-</span> Removed lines
               <span v-if="firstChangedLine" class="change-start">
@@ -175,6 +175,18 @@
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue';
 import axios from 'axios';
+function trackToolUsage(toolName, action, extraData = {}) {
+  if (typeof gtag !== 'undefined') {
+    gtag('event', 'tool_used', {
+      'tool_name': toolName,
+      'action': action,
+      'event_category': 'Tools',
+      'event_label': `${toolName} - ${action}`,
+      ...extraData
+    });
+    console.log(`Tracked: ${toolName} - ${action}`);
+  }
+}
 
 const API_BASE_URL = 'http://192.168.18.101:3000/api/code-diff';
 
@@ -356,6 +368,7 @@ const clearCode = () => {
   error.value = '';
   handleOriginalInput();
   handleModifiedInput();
+  trackToolUsage('code_differ', 'clear');
 };
 
 const loadExample = (type) => {
@@ -410,6 +423,7 @@ greet("World");`
     firstChangedLine.value = null;
     handleOriginalInput();
     handleModifiedInput();
+     trackToolUsage('code_differ', 'load_example', { example_type: type });
   }
 };
 
@@ -438,6 +452,13 @@ const compareCode = async () => {
       stats.value = response.data.stats;
       findFirstChangedLine();
       scrollToFirstChange();
+      trackToolUsage('code_differ', 'compare', {
+        original_length: originalCode.value.length,
+        modified_length: modifiedCode.value.length,
+        added_lines: stats.value?.added || 0,
+        removed_lines: stats.value?.removed || 0,
+        change_percentage: stats.value?.changePercentage || 0
+      });
     } else {
       error.value = response.data.error || 'Comparison failed';
     }
@@ -448,6 +469,14 @@ const compareCode = async () => {
     stats.value = localDiff.stats;
     findFirstChangedLine();
     scrollToFirstChange();
+    trackToolUsage('code_differ', 'compare', {
+      original_length: originalCode.value.length,
+      modified_length: modifiedCode.value.length,
+      added_lines: stats.value?.added || 0,
+      removed_lines: stats.value?.removed || 0,
+      change_percentage: stats.value?.changePercentage || 0,
+      method: 'local'
+    });
   } finally {
     loading.value = false;
   }

@@ -1,6 +1,7 @@
 <script setup>
 import Header from './components/Header.vue'
 import Footer from './components/Footer.vue'
+import CookieConsent from './components/Views/CookieConsent.vue';
 </script>
 
 <template>
@@ -11,6 +12,7 @@ import Footer from './components/Footer.vue'
 
     <main class="content">
       <router-view />
+       <CookieConsent /> 
     </main>
 
     <footer class="footer">

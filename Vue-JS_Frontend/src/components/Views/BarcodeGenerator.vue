@@ -15,12 +15,12 @@
           </p>
         </div>
         <div class="header-actions">
-          <button class="action-button" @click="toggleTheme">
+          <button class="action-button" aria-label="moon" @click="toggleTheme">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-2.98 0-5.4-2.42-5.4-5.4 0-1.81.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z"/>
             </svg>
           </button>
-          <button class="action-button" @click="toggleFullscreen">
+          <button class="action-button" aria-label="fullscreen" @click="toggleFullscreen">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
               <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
             </svg>
@@ -96,24 +96,26 @@
                 </div>
 
                 <div class="option-group">
-                  <label class="option-label">Size Scale</label>
+                  <label for="range-slider" class="option-label">Size Scale</label>
                   <div class="range-input">
-                    <input 
-                      type="range" 
-                      v-model="simpleBarcode.scale" 
-                      min="1" 
-                      max="5" 
-                      step="0.5"
-                      class="range-slider"
-                    >
+                   <input 
+  id="range-slider"
+  type="range"
+  v-model="simpleBarcode.scale"
+  min="1"
+  max="5"
+  step="0.5"
+  class="range-slider"
+>
+
                     <span class="range-value">{{ simpleBarcode.scale }}x</span>
                   </div>
                 </div>
 
                 <div class="option-group">
-                  <label class="option-label">Height</label>
+                  <label for="range-input" class="option-label">Height</label>
                   <div class="range-input">
-                    <input 
+                    <input id="range-input"
                       type="range" 
                       v-model="simpleBarcode.height" 
                       min="50" 
@@ -126,9 +128,9 @@
                 </div>
 
                 <div class="option-group">
-                  <label class="option-label">Show Text</label>
-                  <label class="switch">
-                    <input type="checkbox" v-model="simpleBarcode.includeText">
+                  <label for="show-text" class="option-label">Show Text</label>
+                  <label for="checkbox" class="switch">
+                    <input id="checkbox" type="checkbox" v-model="simpleBarcode.includeText">
                     <span class="slider"></span>
                   </label>
                 </div>
@@ -137,16 +139,16 @@
               <!-- Color Options -->
               <div class="color-options">
                 <div class="color-group">
-                  <label class="color-label">Foreground Color</label>
+                  <label for="color-picker" class="color-label">Foreground Color</label>
                   <div class="color-picker-wrapper">
-                    <input type="color" v-model="simpleBarcode.foreground" class="color-picker">
+                    <input id="color-picker" type="color" v-model="simpleBarcode.foreground" class="color-picker">
                     <span class="color-value">{{ simpleBarcode.foreground }}</span>
                   </div>
                 </div>
                 <div class="color-group">
-                  <label class="color-label">Background Color</label>
+                  <label for="background-color" class="color-label">Background Color</label>
                   <div class="color-picker-wrapper">
-                    <input type="color" v-model="simpleBarcode.background" class="color-picker">
+                    <input id="background-color" type="color" v-model="simpleBarcode.background" class="color-picker">
                     <span class="color-value">{{ simpleBarcode.background }}</span>
                   </div>
                 </div>
@@ -338,8 +340,8 @@
                     </div>
                   </div>
                   <div class="form-group">
-                    <label class="form-label">Encryption</label>
-                    <select v-model="qrCode.wifi.encryption" class="form-select">
+                    <label for="encryption" class="form-label">Encryption</label>
+                    <select v-model="qrCode.wifi.encryption" aria-label="encrypt" class="form-select">
                       <option value="WPA">WPA/WPA2</option>
                       <option value="WEP">WEP</option>
                       <option value="nopass">No Password</option>
@@ -360,7 +362,7 @@
                 <div class="form-grid">
                   <div class="form-group">
                     <label class="form-label">Event Name</label>
-                    <input type="text" v-model="qrCode.event.name" placeholder="Annual Conference">
+                    <input type="text" aria-label="event" v-model="qrCode.event.name" placeholder="Annual Conference">
                   </div>
                   <div class="form-group">
                     <label class="form-label">Date</label>
@@ -409,8 +411,8 @@
                 </div>
 
                 <div class="option-group">
-                  <label class="option-label">Error Correction</label>
-                  <select v-model="qrCode.options.errorCorrection" class="option-select">
+                  <label for="quality" class="option-label">Error Correction</label>
+                  <select id="quality" v-model="qrCode.options.errorCorrection" class="option-select">
                     <option value="L">Low (7%)</option>
                     <option value="M">Medium (15%)</option>
                     <option value="Q">Quartile (25%)</option>
@@ -433,13 +435,17 @@
                   </div>
                 </div>
 
-                <div class="option-group">
-                  <label class="option-label">Add Logo</label>
-                  <label class="switch">
-                    <input type="checkbox" v-model="qrCode.options.includeLogo">
-                    <span class="slider"></span>
-                  </label>
-                </div>
+               <div class="option-group">
+  <label for="switch" class="option-label switch">
+    <input
+      type="checkbox" aria-label="switch"
+      v-model="qrCode.options.includeLogo"
+    >
+    <span class="slider"></span>
+    <span class="switch-text" aria-label="logo">Add Logo</span>
+  </label>
+</div>
+
               </div>
 
               <div class="color-options" v-if="!qrCode.options.includeLogo">
@@ -593,7 +599,7 @@
                   >
                 </div>
                 <div class="form-group">
-                  <label class="form-label">Price</label>
+                  <label for="price" class="form-label">Price</label>
                   <div class="price-input">
                     <select v-model="productData.currency" class="currency-select">
                       <option value="USD">$</option>
@@ -634,7 +640,7 @@
                   >
                 </div>
                 <div class="form-group full-width">
-                  <label class="form-label">Barcode Type</label>
+                  <label for="barcode" class="form-label">Barcode Type</label>
                   <select v-model="productData.type" class="form-select">
                     <option value="ean13">EAN-13 (Recommended)</option>
                     <option value="code128">CODE128</option>
@@ -775,8 +781,8 @@ Or just numbers:
             <div class="batch-options">
               <div class="options-grid">
                 <div class="option-group">
-                  <label class="option-label">Barcode Type</label>
-                  <select v-model="batchData.type" class="option-select">
+                  <label for="barcode-type" class="option-label">Barcode Type</label>
+                  <select v-model="batchData.type" class="option-select" aria-label="barcode-type">
                     <option value="code128">CODE128</option>
                     <option value="code39">CODE39</option>
                     <option value="ean13">EAN-13</option>
@@ -930,6 +936,18 @@ import axios from 'axios';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 
+function trackToolUsage(toolName, action, extraData = {}) {
+  if (typeof gtag !== 'undefined') {
+    gtag('event', 'tool_used', {
+      'tool_name': toolName,
+      'action': action,
+      'event_category': 'Tools',
+      'event_label': `${toolName} - ${action}`,
+      ...extraData
+    });
+    console.log(`Tracked: ${toolName} - ${action}`);
+  }
+}
 const API_BASE_URL = 'http://192.168.18.101:3000/api/barcode';
 
 // State
@@ -1167,6 +1185,11 @@ const generateSimpleBarcode = async () => {
     if (response.data.success) {
       simpleBarcode.preview = response.data.barcode;
       showNotification('Barcode generated successfully!');
+       trackToolUsage('simple_barcode', 'generate', {
+        type: simpleBarcode.type,
+        text_length: simpleBarcode.text.length
+      });
+
     } else {
       error.simple = response.data.error || 'Failed to generate barcode';
     }
@@ -1212,6 +1235,10 @@ const generateQRCode = async () => {
         if (contactResponse.data.success) {
           qrCode.preview = contactResponse.data.qrcode;
           showNotification('Contact QR code generated successfully!');
+           trackToolUsage('qr_code', 'generate', {
+      qr_type: qrCode.type,
+      content_length: qrContent?.length || 0
+    });
           loading.qr = false;
           return;
         }
@@ -1317,6 +1344,11 @@ const generateProductBarcode = async () => {
     if (response.data.success) {
       productData.preview = response.data.barcode;
       showNotification('Product barcode generated successfully!');
+       trackToolUsage('product_barcode', 'generate', {
+      type: productData.type,
+      has_product_name: !!productData.productName,
+      has_price: !!productData.price
+    });
     } else {
       error.product = response.data.error || 'Failed to generate product barcode';
     }
@@ -1367,6 +1399,10 @@ const generateBatchBarcodes = async () => {
     if (response.data.success) {
       batchData.results = response.data.items.filter(item => item.success);
       showNotification(`Generated ${batchData.results.length} barcodes successfully!`);
+       trackToolUsage('batch_barcode', 'generate', {
+      count: batchData.results.length,
+      type: batchData.type
+    });
     } else {
       error.batch = response.data.error || 'Failed to generate batch barcodes';
     }
@@ -1399,6 +1435,8 @@ const downloadBarcode = (type) => {
   link.click();
   document.body.removeChild(link);
   showNotification('Barcode downloaded!');
+    trackToolUsage(type + '_barcode', 'download');
+
 };
 
 const downloadQRCode = () => {
@@ -1412,6 +1450,8 @@ const downloadQRCode = () => {
   link.click();
   document.body.removeChild(link);
   showNotification('QR code downloaded!');
+    trackToolUsage('qr_code', 'download', { qr_type: qrCode.type });
+
 };
 
 const downloadProductBarcode = () => {

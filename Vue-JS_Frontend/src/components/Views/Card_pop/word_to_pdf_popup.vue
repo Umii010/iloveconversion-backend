@@ -1,6 +1,17 @@
 <script setup>
 import { ref } from 'vue'
-
+function trackToolUsage(toolName, action, extraData = {}) {
+  if (typeof gtag !== 'undefined') {
+    gtag('event', 'tool_used', {
+      'tool_name': toolName,
+      'action': action,
+      'event_category': 'Tools',
+      'event_label': `${toolName} - ${action}`,
+      ...extraData
+    });
+    console.log(`Tracked: ${toolName} - ${action}`);
+  }
+}
 const file = ref(null)
 const loading = ref(false)
 const progress = ref(0)
@@ -8,6 +19,15 @@ const statusText = ref('')
 
 const selectFile = (e) => {
   file.value = e.target.files[0]
+   if (file.value && typeof gtag !== 'undefined') {
+    gtag('event', 'file_selected', {
+      'tool_name': 'word_to_pdf',
+      'file_size': file.value.size,
+      'file_type': file.value.type,
+      'file_name': file.value.name,
+      'event_category': 'File Upload'
+    });
+  }
 }
 
 const wordToPdf = async () => {
@@ -62,6 +82,12 @@ const wordToPdf = async () => {
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
+      trackToolUsage('word_to_pdf', 'convert', {
+      original_file_size: originalSize || file.value.size,
+      converted_file_size: convertedSize || blob.size,
+      file_extension: file.value.name.split('.').pop().toLowerCase(),
+      success: true
+    });
 
     // Reset input after download
     file.value = null
@@ -71,6 +97,12 @@ const wordToPdf = async () => {
     console.error(err)
     statusText.value = 'Conversion failed'
     alert('Conversion failed')
+     trackToolUsage('word_to_pdf', 'convert', {
+      file_extension: file.value?.name?.split('.').pop().toLowerCase() || 'unknown',
+      file_size: file.value?.size || 0,
+      success: false,
+      error: err.message.substring(0, 50)
+    });
   } finally {
     loading.value = false
     setTimeout(() => {

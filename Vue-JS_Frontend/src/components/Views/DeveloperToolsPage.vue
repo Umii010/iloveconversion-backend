@@ -9,7 +9,7 @@
           </p>
         </div>
         <div class="header-actions">
-          <button class="action-button" @click="toggleTheme">
+          <button class="action-button" aria-label="moon" @click="toggleTheme">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-2.98 0-5.4-2.42-5.4-5.4 0-1.81.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z"/>
             </svg>
@@ -80,7 +80,7 @@
                   </div>
                 </div>
                 <textarea 
-                  v-model="jsonInput" 
+                  v-model="jsonInput"  aria-label="json input"
                   class="code-editor" 
                   rows="6"
                   spellcheck="false"
@@ -119,7 +119,7 @@
                   </div>
                 </div>
                 <textarea 
-                  v-model="xmlInput" 
+                  v-model="xmlInput" aria-label="xml input"
                   class="code-editor" 
                   rows="6"
                   spellcheck="false"
@@ -182,7 +182,7 @@
                 </div>
                 <textarea 
                   v-model="jsonYamlInput.json" 
-                  class="code-editor" 
+                  class="code-editor" aria-label="json to yaml"
                   rows="6"
                   spellcheck="false"
                 ></textarea>
@@ -216,7 +216,7 @@
                 <textarea 
                   v-model="yamlInput" 
                   class="code-editor" 
-                  rows="6"
+                  rows="6" aria-label="yml input"
                   spellcheck="false"
                 ></textarea>
               </div>
@@ -272,7 +272,7 @@
                 <textarea 
                   v-model="csvJsonInput.csv" 
                   class="code-editor" 
-                  rows="6"
+                  rows="6" aria-label="csv input"
                   spellcheck="false"
                 ></textarea>
               </div>
@@ -311,7 +311,7 @@
                 <textarea 
                   v-model="csvJsonOutput.json" 
                   class="code-editor" 
-                  rows="6"
+                  rows="6" aria-label="json ontput"
                   spellcheck="false"
                 ></textarea>
               </div>
@@ -380,7 +380,7 @@
                 <div class="code-editor-wrapper">
                   <textarea 
                     v-model="sqlMongoInput.sql" 
-                    class="code-editor" 
+                    class="code-editor" aria-label="sql input"
                     placeholder="SELECT * FROM users WHERE age > 25 AND city = 'NYC' ORDER BY name LIMIT 10"
                     rows="6"
                     spellcheck="false"
@@ -449,7 +449,7 @@
                 <div class="code-editor-wrapper">
                   <textarea 
                     v-model="javaCsharpInput.java" 
-                    class="code-editor" 
+                    class="code-editor"  aria-label="java input"
                     placeholder='public class User {
   private String name;
   private int age;
@@ -524,7 +524,7 @@
                 <div class="code-editor-wrapper">
                   <textarea 
                     v-model="pythonJsInput.python" 
-                    class="code-editor" 
+                    class="code-editor" aria-label="python input"
                     placeholder='def calculate_sum(numbers):
     total = 0
     for num in numbers:
@@ -606,7 +606,7 @@
                 <div class="code-editor-wrapper">
                   <textarea 
                     v-model="curlInput.curl" 
-                    class="code-editor" 
+                    class="code-editor" aria-label="curl input"
                     placeholder='curl -X GET "https://api.example.com/users" -H "Authorization: Bearer token"'
                     rows="4"
                     spellcheck="false"
@@ -745,6 +745,18 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue';
 import axios from 'axios';
+function trackToolUsage(toolName, action, extraData = {}) {
+  if (typeof gtag !== 'undefined') {
+    gtag('event', 'tool_used', {
+      'tool_name': toolName,
+      'action': action,
+      'event_category': 'Tools',
+      'event_label': `${toolName} - ${action}`,
+      ...extraData
+    });
+    console.log(`Tracked: ${toolName} - ${action}`);
+  }
+}
 
 const API_BASE_URL = 'http://192.168.18.101:3000/api/developer';
 
@@ -908,6 +920,13 @@ const copyToClipboard = async (text) => {
     }
     
     showNotification('Copied to clipboard!');
+     if (typeof gtag !== 'undefined') {
+      gtag('event', 'tool_used', {
+        'tool_name': 'developer_tools',
+        'action': 'copy',
+        'event_category': 'Tools',
+        'event_label': 'Copied output'
+      });}
   } catch (err) {
     console.error('Failed to copy:', err);
     alert('Failed to copy to clipboard. Please try again.');
@@ -990,6 +1009,10 @@ const convertJsonToXml = async () => {
 
     if (response.data.success) {
       outputText.value = response.data.xml;
+       trackToolUsage('json_to_xml', 'convert', {
+        input_length: jsonInput.value.length,
+        output_length: outputText.value.length
+      });
     } else {
       error.jsonToXml = response.data.error || 'Conversion failed';
     }
@@ -1018,6 +1041,10 @@ const convertXmlToJson = async () => {
 
     if (response.data.success) {
       outputText.value = response.data.json;
+        trackToolUsage('xml_to_json', 'convert', {
+        input_length: xmlInput.value.length,
+        output_length: outputText.value.length
+      });
     } else {
       error.xmlToJson = response.data.error || 'Conversion failed';
     }
@@ -1046,6 +1073,10 @@ const convertJsonToYaml = async () => {
 
     if (response.data.success) {
       yamlOutput.value = response.data.yaml;
+       trackToolUsage('json_to_yaml', 'convert', {
+        input_length: jsonYamlInput.json.length,
+        output_length: yamlOutput.value.length
+      });
     } else {
       error.jsonToYaml = response.data.error || 'Conversion failed';
     }
@@ -1074,6 +1105,10 @@ const convertYamlToJson = async () => {
 
     if (response.data.success) {
       yamlOutput.value = response.data.json;
+       trackToolUsage('yaml_to_json', 'convert', {
+        input_length: yamlInput.value.length,
+        output_length: yamlOutput.value.length
+      });
     } else {
       error.yamlToJson = response.data.error || 'Conversion failed';
     }
@@ -1104,6 +1139,10 @@ const convertCsvToJson = async () => {
 
     if (response.data.success) {
       csvOutput.value = response.data.json;
+        trackToolUsage('csv_to_json', 'convert', {
+        input_length: csvJsonInput.csv.length,
+        output_length: csvOutput.value.length
+      });
     } else {
       error.csvToJson = response.data.error || 'Conversion failed';
     }
@@ -1133,6 +1172,10 @@ const convertJsonToCsv = async () => {
 
     if (response.data.success) {
       csvOutput.value = response.data.csv;
+        trackToolUsage('json_to_csv', 'convert', {
+        input_length: csvJsonOutput.json.length,
+        output_length: csvOutput.value.length
+      });
     } else {
       error.jsonToCsv = response.data.error || 'Conversion failed';
     }
@@ -1161,6 +1204,10 @@ const convertSqlToMongo = async () => {
 
     if (response.data.success) {
       sqlMongoOutput.mongo = response.data.mongo;
+       trackToolUsage('sql_to_mongo', 'convert', {
+        input_length: sqlMongoInput.sql.length,
+        output_length: sqlMongoOutput.mongo.length
+      });
     } else {
       error.sqlToMongo = response.data.error || 'Conversion failed';
     }
@@ -1188,6 +1235,10 @@ const convertJavaToCSharp = async () => {
 
     if (response.data.success) {
       javaCsharpOutput.csharp = response.data.csharp;
+       trackToolUsage('java_to_csharp', 'convert', {
+        input_length: javaCsharpInput.java.length,
+        output_length: javaCsharpOutput.csharp.length
+      });
     } else {
       error.javaToCSharp = response.data.error || 'Conversion failed';
     }
@@ -1215,6 +1266,10 @@ const convertPythonToJs = async () => {
 
     if (response.data.success) {
       pythonJsOutput.javascript = response.data.javascript;
+       trackToolUsage('python_to_javascript', 'convert', {
+        input_length: pythonJsInput.python.length,
+        output_length: pythonJsOutput.javascript.length
+      });
     } else {
       error.pythonToJs = response.data.error || 'Conversion failed';
     }
@@ -1243,6 +1298,11 @@ const convertCurl = async () => {
 
     if (response.data.success) {
       curlOutput.code = response.data.code;
+       trackToolUsage('curl_converter', 'convert', {
+        input_length: curlInput.curl.length,
+        output_length: curlOutput.code.length,
+        target_type: curlOutput.type
+      });
     } else {
       error.curlConvert = response.data.error || 'Conversion failed';
       curlOutput.code = '';

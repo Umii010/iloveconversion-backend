@@ -1,6 +1,17 @@
 <script setup>
 import { ref, computed } from 'vue'
-
+function trackToolUsage(toolName, action, extraData = {}) {
+  if (typeof gtag !== 'undefined') {
+    gtag('event', 'tool_used', {
+      'tool_name': toolName,
+      'action': action,
+      'event_category': 'Tools',
+      'event_label': `${toolName} - ${action}`,
+      ...extraData
+    });
+    console.log(`Tracked: ${toolName} - ${action}`);
+  }
+}
 const file = ref(null)
 const password = ref('')
 const loading = ref(false)
@@ -14,6 +25,13 @@ const selectFile = (e) => {
   file.value = e.target.files[0]
   password.value = ''
   showPasswordField.value = true
+  if (file.value) {
+    trackToolUsage('pdf_unlocker', 'file_selected', {
+      file_name: file.value.name,
+      file_size: file.value.size,
+      file_type: file.value.type
+    });
+  }
 }
 
 const closePopup = () => {
@@ -87,12 +105,22 @@ const unlockPdf = async () => {
     showSuccessPopup.value = true
     popupMessage.value = '✅ PDF successfully unlocked!'
     statusText.value = 'PDF unlocked successfully'
+     trackToolUsage('pdf_unlocker', 'unlock_success', {
+      file_name: file.value.name,
+      file_size: file.value.size,
+      password_provided: !!password.value
+    }); 
 
   } catch (err) {
     console.error(err)
     statusText.value = 'Unlock failed'
     popupMessage.value = '❌ Invalid password or corrupted PDF'
     showSuccessPopup.value = true
+     trackToolUsage('pdf_unlocker', 'unlock_failed', {
+      file_name: file.value.name,
+      file_size: file.value.size,
+      error_type: err.message.includes('password') ? 'invalid_password' : 'server_error'
+    });
   } finally {
     clearInterval(fakeProgress)
     setTimeout(() => {

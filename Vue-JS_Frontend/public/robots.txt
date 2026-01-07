@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: http://192.168.18.101:5173/sitemap.xml

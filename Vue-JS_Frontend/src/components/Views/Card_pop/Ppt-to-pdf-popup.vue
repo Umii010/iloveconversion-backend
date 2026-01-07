@@ -1,6 +1,17 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
-
+function trackToolUsage(toolName, action, extraData = {}) {
+  if (typeof gtag !== 'undefined') {
+    gtag('event', 'tool_used', {
+      'tool_name': toolName,
+      'action': action,
+      'event_category': 'Tools',
+      'event_label': `${toolName} - ${action}`,
+      ...extraData
+    });
+    console.log(`Tracked: ${toolName} - ${action}`);
+  }
+}
 const file = ref(null)
 const loading = ref(false)
 const progress = ref(0)
@@ -82,6 +93,11 @@ const selectFile = (e) => {
   if (!isValid) {
     showNotification('Please select a PowerPoint file (.ppt, .pptx, .pps, .ppsx, .odp)', 4000)
     e.target.value = ''
+      trackToolUsage('ppt_to_pdf', 'invalid_file', {
+      file_name: selectedFile.name,
+      file_type: selectedFile.type,
+      file_size_mb: parseFloat((selectedFile.size / (1024 * 1024)).toFixed(1))
+    });
     return
   }
   
@@ -89,6 +105,11 @@ const selectFile = (e) => {
   if (selectedFile.size > 100 * 1024 * 1024) {
     showNotification('File size exceeds 100MB limit', 4000)
     e.target.value = ''
+     trackToolUsage('ppt_to_pdf', 'file_too_large', {
+      file_name: selectedFile.name,
+      file_size_mb: parseFloat((selectedFile.size / (1024 * 1024)).toFixed(1)),
+      limit_mb: 100
+    });
     return
   }
   
@@ -97,6 +118,11 @@ const selectFile = (e) => {
   estimatedTime.value = estimateTime(fileSizeMB)
   
   showNotification(`✓ ${selectedFile.name} loaded (${fileSizeMB.toFixed(1)} MB)`, 3000)
+   trackToolUsage('ppt_to_pdf', 'file_selected', {
+    file_name: selectedFile.name,
+    file_size_mb: parseFloat(fileSizeMB.toFixed(1)),
+    file_extension: selectedFile.name.split('.').pop().toLowerCase()
+  });
 }
 
 const convertPptToPdf = async () => {
@@ -180,6 +206,12 @@ const convertPptToPdf = async () => {
       `📄 Saved as: ${fileName}`,
       6000
     )
+     trackToolUsage('ppt_to_pdf', 'convert', {
+      file_size_mb: parseFloat((file.value.size / (1024 * 1024)).toFixed(1)),
+      conversion_time_seconds: totalTime,
+      output_size_mb: parseFloat(downloadSize),
+      file_extension: file.value.name.split('.').pop().toLowerCase()
+    });
 
   } catch (err) {
     console.error('PPT to PDF error:', err)
@@ -196,6 +228,11 @@ const convertPptToPdf = async () => {
     
     showNotification(` ${userMessage}`, 5000)
     statusText.value = 'Conversion failed'
+     trackToolUsage('ppt_to_pdf', 'convert_failed', {
+      file_size_mb: file.value ? parseFloat((file.value.size / (1024 * 1024)).toFixed(1)) : 0,
+      error_message: err.message.substring(0, 100),
+      file_extension: file.value ? file.value.name.split('.').pop().toLowerCase() : 'unknown'
+    });
     
   } finally {
     stopTimer()
@@ -213,6 +250,12 @@ const convertPptToPdf = async () => {
 
 // Clear selected file
 const clearFile = () => {
+  if (file.value) {
+    trackToolUsage('ppt_to_pdf', 'file_cleared', {
+      file_name: file.value.name,
+      file_size_mb: parseFloat((file.value.size / (1024 * 1024)).toFixed(1))
+    });
+  }
   file.value = null
   estimatedTime.value = ''
   const input = document.querySelector('input[type="file"]')

@@ -216,7 +216,7 @@
             <div class="chart-container">
               <div class="chart-header">
                 <h3><i class="fas fa-chart-line"></i> Success Rate Trend</h3>
-                <select v-model="selectedTimeframe" class="timeframe-select" @change="onTimeframeChange">
+                <select v-model="selectedTimeframe" class="timeframe-select" aria-label="time-frame" @change="onTimeframeChange">
                   <option value="7d">Last 7 Days</option>
                   <option value="30d">Last 30 Days</option>
                   <option value="90d">Last 90 Days</option>
@@ -485,7 +485,6 @@ export default {
         loading.value = true;
         error.value = null;
         
-        console.log('🔄 Fetching analytics data from your API...');
         
         // Fetch data from your actual APIs
         const [dashboardResponse, toolsResponse, trendsResponse, growthResponse, deviceCountryResponse] = await Promise.all([
@@ -496,13 +495,7 @@ export default {
           axios.get('http://192.168.18.101:3000/api/analytics/stats/devices-countries')
         ]);
         
-        console.log('📊 API Responses:', {
-          dashboard: dashboardResponse.data,
-          tools: toolsResponse.data,
-          trends: trendsResponse.data,
-          growth: growthResponse.data,
-          devices: deviceCountryResponse.data
-        });
+      
         
         // Set data from your API responses
         dashboardStats.value = dashboardResponse.data?.data || {};
@@ -518,7 +511,7 @@ export default {
         
         // If API returns empty data, use fallback mock data
         if (toolsData.value.length === 0) {
-          console.log('⚠️ No tools data from API, using fallback data');
+        
           useFallbackData();
         }
         
@@ -528,7 +521,6 @@ export default {
         await nextTick();
         initCharts();
         
-        console.log('✅ Analytics data fetched successfully');
         
       } catch (err) {
         console.error('❌ Error fetching analytics data:', err);
@@ -622,7 +614,6 @@ export default {
     };
     
     const initCharts = () => {
-      console.log('📊 Initializing charts with your data...');
       
       // Destroy existing charts
       destroyCharts();
@@ -674,7 +665,6 @@ export default {
             }
           });
           
-          console.log('✅ Usage chart created with data:', categoryData);
         }
         
         // 2. Success Rate Chart (Line)
@@ -723,7 +713,6 @@ export default {
             }
           });
           
-          console.log('✅ Success chart created with', usageTrends.value.success.length, 'data points');
         }
         
         // 3. User Growth Chart (Bar)
@@ -757,7 +746,6 @@ export default {
             }
           });
           
-          console.log('✅ Growth chart created with', userGrowth.value.newUsers.length, 'data points');
         }
         
       } catch (err) {
@@ -986,12 +974,10 @@ export default {
     
     // Lifecycle
     onMounted(() => {
-      console.log('🚀 Analytics Dashboard mounted');
       fetchData();
     });
     
     onUnmounted(() => {
-      console.log('🗑️ Cleaning up charts...');
       destroyCharts();
     });
     

@@ -1,6 +1,17 @@
 <script setup>
 import { ref, computed } from 'vue'
-
+function trackToolUsage(toolName, action, extraData = {}) {
+  if (typeof gtag !== 'undefined') {
+    gtag('event', 'tool_used', {
+      'tool_name': toolName,
+      'action': action,
+      'event_category': 'Tools',
+      'event_label': `${toolName} - ${action}`,
+      ...extraData
+    });
+    console.log(`Tracked: ${toolName} - ${action}`);
+  }
+}
 const file = ref(null)
 const loading = ref(false)
 const progress = ref(0)
@@ -46,6 +57,10 @@ const selectFile = (e) => {
     file.value = selectedFile
     uploadTime.value = new Date()
     statusText.value = `File selected: ${selectedFile.name}`
+    trackToolUsage('pdf_to_png', 'file_selected', {
+      file_size: selectedFile.size,
+      file_name: selectedFile.name
+    });
   }
 }
 
@@ -131,6 +146,14 @@ const pdfToPng = async () => {
 
     progress.value = 100
     statusText.value = 'Conversion complete! Downloading...'
+     trackToolUsage('pdf_to_png', 'convert', {
+      file_size: file.value.size,
+      page_count: parseInt(pageCount),
+      is_zip: isZip,
+      conversion_time: parseFloat(timeTaken),
+      original_size: formatBytes(file.value.size),
+      converted_size: formatBytes(parseInt(totalSize) || 0)
+    });
 
     // Get blob and download
     const blob = await res.blob()
@@ -151,6 +174,11 @@ const pdfToPng = async () => {
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
+    trackToolUsage('pdf_to_png', 'download', {
+  download_name: downloadName,
+  is_zip: isZip,
+  page_count: parseInt(pageCount)
+});
 
     // Show success popup
     setTimeout(() => {
@@ -167,6 +195,10 @@ const pdfToPng = async () => {
     console.error('Conversion error:', err)
     statusText.value = `Error: ${err.message}`
     alert(`Conversion failed: ${err.message}`)
+     trackToolUsage('pdf_to_png', 'error', {
+      error_message: err.message,
+      file_size: file.value?.size || 0
+    });
   } finally {
     loading.value = false
   }
