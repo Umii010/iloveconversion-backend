@@ -12,7 +12,7 @@ const app = express();
 app.use(cookieParser());
 app.use(cors());
 app.use(express.json());
-app.use(userTracker);
+// app.use(userTracker);
 
 app.use(morgan(':date[clf] ":method :url" :status :response-time ms'));
 
@@ -20,7 +20,7 @@ const userRoutes = require('./routes/userRoutes');
 const developerRoutes = require('./routes/developerRoutes');
 const codeDiffRoutes = require('./routes/codeDiffRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
-const consentRoutes = require('./routes/consentRoutes')
+// const consentRoutes = require('./routes/consentRoutes')
 
 
 app.use('/api', userRoutes);
@@ -29,7 +29,7 @@ app.use('/api/code-diff', codeDiffRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/barcode', barcodeRoutes);
 app.use('/api/encoder', encoderRoutes);
-app.use('/api/consent', consentRoutes);
+// app.use('/api/consent', consentRoutes);
 
 
 
