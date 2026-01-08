@@ -1,6 +1,7 @@
 const bwipjs = require('bwip-js'); // For barcode generation
 const QRCode = require('qrcode'); // For QR code generation
 const JsBarcode = require('jsbarcode'); // For additional barcode support
+const { createCanvas } = require('canvas');
 const Logger = require('../services/logger');
 
 class BarcodeController {
