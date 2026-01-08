@@ -4,7 +4,7 @@ const BarcodeController = require('../controllers/barcodeController');
 const { verifyToken } = require('../middleware/auth');
 
 // Barcode routes
-router.post('/generate-barcode', BarcodeController.generateBarcode);
+router.post('/generate-barcode', verifyToken, BarcodeController.generateBarcode);
 router.post('/generate-qrcode', verifyToken, BarcodeController.generateQRCode);
 router.post('/generate-product-barcode', verifyToken, BarcodeController.generateProductBarcode);
 router.post('/generate-contact-qr', verifyToken, BarcodeController.generateContactQR);
