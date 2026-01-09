@@ -26,6 +26,7 @@ const ocrPdfController = require('../controllers/ocrPdfController');
 const FileCorruptorController = require('../controllers/fileCorruptorController');
 const minifyController = require('../controllers/minifyController');
 const videoDownloaderController = require('../controllers/videoDownloaderController');
+const screenshotController = require('../controllers/screenshotController');
 
 
 
@@ -129,6 +130,12 @@ router.post('/add-page-numbers', upload.single('file'), addPageNumbersController
 router.post('/protect-pdf', upload.single('file'), protectPdfController.protectPdf);
 router.post('/ocr-pdf', upload.single('file'), ocrPdfController.ocrPdf);
 router.post('/process-code', minifyController.processCode);
+
+
+router.post('/screenshot', (req, res, next) => {
+  console.log('✅ /api/screenshot HIT');
+  next();
+}, screenshotController.captureScreenshot);
 
 
 // Video Downloader Routes
