@@ -20,7 +20,10 @@ const userRoutes = require('./routes/userRoutes');
 const developerRoutes = require('./routes/developerRoutes');
 const codeDiffRoutes = require('./routes/codeDiffRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
-// const consentRoutes = require('./routes/consentRoutes')
+const designRoutes = require('./routes/designRoutes');
+const colorRoutes = require('./routes/colorRoutes');
+
+
 
 
 app.use('/api', userRoutes);
@@ -29,8 +32,8 @@ app.use('/api/code-diff', codeDiffRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/barcode', barcodeRoutes);
 app.use('/api/encoder', encoderRoutes);
-// app.use('/api/consent', consentRoutes);
-
+app.use('/api/colors', colorRoutes);   
+app.use('/api/design', designRoutes); 
 
 
 

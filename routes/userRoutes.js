@@ -27,6 +27,8 @@ const FileCorruptorController = require('../controllers/fileCorruptorController'
 const minifyController = require('../controllers/minifyController');
 const videoDownloaderController = require('../controllers/videoDownloaderController');
 const screenshotController = require('../controllers/screenshotController');
+// const colorExtractorController = require('../controllers/colorExtractorController');
+
 
 
 
@@ -133,9 +135,10 @@ router.post('/process-code', minifyController.processCode);
 
 
 router.post('/screenshot', (req, res, next) => {
-  console.log('✅ /api/screenshot HIT');
   next();
 }, screenshotController.captureScreenshot);
+
+// router.post('/color-extract', colorExtractorController.extractColors);
 
 
 // Video Downloader Routes
