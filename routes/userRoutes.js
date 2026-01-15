@@ -110,15 +110,16 @@ const upload = multer({
 });
 
 //Routes
-router.post('/compress-pdf',upload.single('pdf'), compresspdfController.compressPdf);
-router.post('/merge-pdf', upload.array('files', 10), mergePdfController.mergePdfs);
+router.post('/compress-pdf', upload.array('pdf', 15), compresspdfController.compressPdf);
+router.post('/merge-pdf', upload.array('files', 20), mergePdfController.mergePdfs);
 router.post('/pdf-to-word', upload.single('file'), pdfToWordController.pdfToWord);
+
 router.post('/word-to-pdf', upload.single('file'), wordToPdfController.wordToPdf);
 router.post('/pdf-to-png', upload.single('file'), pdfToPngController.pdfToPng);
 router.post('/image-to-pdf',upload.array('images', 20),imageToPdfController.imageToPdf);
 router.post('/ppt-to-pdf',upload.single('file'),pptToPdfController.pptToPdf);
 router.post( '/rotate-pdf',upload.array('files', 10),rotatePdfController.rotatePdf);
-router.post('/corrupt-file', upload.single('file'), FileCorruptorController.handleCorruptFile);
+router.post('/corrupt-files', upload.array('files', 10), FileCorruptorController.handleCorruptFiles);
 router.post('/unlock-pdf', upload.array('files', 10),unlockPdfController.unlockPdf);
 router.post('/pdf-to-excel',upload.single('file'),pdfToExcelController.pdfToExcel);
 router.post('/html-to-pdf', htmlToPdfController.htmlToPdf);
