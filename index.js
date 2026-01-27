@@ -6,6 +6,8 @@ const cookieParser = require('cookie-parser');
 const userTracker = require('./middleware/userTracker');
 const barcodeRoutes = require('./routes/barcodeRoutes');
 const encoderRoutes = require('./routes/encoderRoutes');
+const heicConverterRoutes = require('./routes/heicConverter');
+
 
 const app = express();
 
@@ -34,6 +36,8 @@ app.use('/api/barcode', barcodeRoutes);
 app.use('/api/encoder', encoderRoutes);
 app.use('/api/colors', colorRoutes);   
 app.use('/api/design', designRoutes); 
+app.use('/api/heic', heicConverterRoutes);
+
 
 
 
