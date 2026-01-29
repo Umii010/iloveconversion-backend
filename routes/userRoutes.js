@@ -4,6 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const os = require('os');
 
+const UserController = require('../controllers/userController');
 const pdfToPngController = require('../controllers/pdfToPngController');
 const compresspdfController = require('../controllers/compresspdfController');
 const mergePdfController = require('../controllers/mergepdfController');
@@ -30,7 +31,11 @@ const screenshotController = require('../controllers/screenshotController');
 // const colorExtractorController = require('../controllers/colorExtractorController');
 
 
-
+const { 
+  registerValidation, 
+  loginValidation, 
+  updateUserValidation 
+} = require('../middleware/validation');
 
 
 
@@ -108,6 +113,28 @@ const upload = multer({
     }
   }
 });
+
+
+
+
+// Public routes
+router.post('/register', registerValidation, UserController.register);
+router.post('/login', loginValidation, UserController.login);
+
+// Forgot password routes
+router.post('/forgot-password', UserController.forgotPassword);
+router.post('/reset-password', UserController.resetPassword);
+
+router.post('/logout', UserController.logout);
+router.post('/logout-all', UserController.logoutAll);
+
+// User routes (protected in production)
+router.get('/users', UserController.getAllUsers);
+router.get('/users/:id', UserController.getUserById);
+router.put('/users/:id', updateUserValidation, UserController.updateUser);
+router.delete('/users/:id', UserController.deleteUser);
+
+
 
 //Routes
 router.post('/compress-pdf', upload.array('pdf', 15), compresspdfController.compressPdf);
