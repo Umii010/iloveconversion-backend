@@ -8,12 +8,13 @@ const encoderRoutes = require('./routes/encoderRoutes');
 const heicConverterRoutes = require('./routes/heicConverter');
 const dotenv = require('dotenv');
 const { testConnection } = require('./config/database');
+const session = require('express-session');
+
 
 dotenv.config();
 
 const app = express();
 
-// CORS configuration - MUST BE BEFORE ROUTES
 app.use(cors({
   origin: ['http://localhost:5173', 'http://192.168.18.101:5173', 'http://localhost:8080'],
   credentials: true,
@@ -25,7 +26,14 @@ app.use(cors({
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-// app.use(userTracker);
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || 'supersecret',
+    resave: false,
+    saveUninitialized: false,
+    cookie: { secure: false } 
+  })
+);
 
 app.use(morgan(':date[clf] ":method :url" :status :response-time ms'));
 
