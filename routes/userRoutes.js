@@ -124,6 +124,7 @@ const upload = multer({
 });
 
 
+router.get('/auth/status', UserController.checkAuthStatus);
 
 
 // Public routes

@@ -220,6 +220,49 @@ class UserController {
     }
   }
 
+  // Check authentication status
+static async checkAuthStatus(req, res) {
+  try {
+    if (!req.session.userId) {
+      return res.status(200).json({
+        success: true,
+        authenticated: false
+      });
+    }
+
+    const user = await User.getById(req.session.userId);
+    if (!user) {
+      // Clear invalid session
+      req.session.destroy();
+      res.clearCookie('sessionId');
+      res.clearCookie('connect.sid');
+      
+      return res.status(200).json({
+        success: true,
+        authenticated: false
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      authenticated: true,
+      user: {
+        id: Number(user.id),
+        name: user.name,
+        email: user.email,
+        country: user.country
+      }
+    });
+    
+  } catch (error) {
+    console.error('Auth status check error:', error);
+    res.status(200).json({
+      success: true,
+      authenticated: false
+    });
+  }
+}
+
   // Update user (protected)
   static async updateUser(req, res) {
     try {
