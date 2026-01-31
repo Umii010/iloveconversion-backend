@@ -9,6 +9,8 @@ const heicConverterRoutes = require('./routes/heicConverter');
 const dotenv = require('dotenv');
 const { testConnection } = require('./config/database');
 const session = require('express-session');
+const sessionMiddleware = require('./middleware/session');
+const paymentRoutes = require('./routes/paymentRoutes');
 
 
 dotenv.config();
@@ -16,14 +18,18 @@ dotenv.config();
 const app = express();
 
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://192.168.18.101:5173', 'http://localhost:8080'],
+  origin: ['http://localhost:5173', 'http://192.168.18.101:5173', 'http://192.168.0.171:5173'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+   exposedHeaders: ['set-cookie']
 }));
 
 
 app.use(cookieParser());
+
+app.use(sessionMiddleware);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(
@@ -85,6 +91,8 @@ app.use('/api/encoder', encoderRoutes);
 app.use('/api/colors', colorRoutes);   
 app.use('/api/design', designRoutes); 
 app.use('/api/heic', heicConverterRoutes);
+app.use('/api', paymentRoutes);
+
 
 
 

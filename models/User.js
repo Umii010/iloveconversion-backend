@@ -3,36 +3,64 @@ const bcrypt = require('bcryptjs');
 
 class User {
   // Create new user
-  static async create(userData) {
-    let conn;
-    try {
-      conn = await pool.getConnection();
-      
-      // Hash password
+  // Create new user - UPDATED VERSION
+static async create(userData) {
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    
+    // Hash password if provided
+    let hashedPassword = userData.password;
+    if (userData.password) {
       const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(userData.password, salt);
-      
-      const result = await conn.query(
-        'INSERT INTO users (name, email, password, country) VALUES (?, ?, ?, ?)',
-        [userData.name, userData.email, hashedPassword, userData.country]
-      );
-      
-      // Convert BigInt to Number
-      const userId = Number(result.insertId);
-      
-      return {
-        id: userId,
-        name: userData.name,
-        email: userData.email,
-        country: userData.country
-      };
-      
-    } catch (error) {
-      throw error;
-    } finally {
-      if (conn) conn.release();
+      hashedPassword = await bcrypt.hash(userData.password, salt);
+    } else {
+      // Generate random password if not provided
+      const salt = await bcrypt.genSalt(10);
+      hashedPassword = await bcrypt.hash(Math.random().toString(36).slice(-8), salt);
     }
+    
+    const result = await conn.query(
+      `INSERT INTO users (
+        name, email, password, country, 
+        is_pro, subscription_plan, 
+        stripe_customer_id, subscription_id, current_period_end
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        userData.name || '',
+        userData.email,
+        hashedPassword,
+        userData.country || 'US',
+        userData.is_pro || 0,
+        userData.subscription_plan || 'free',
+        userData.stripe_customer_id || null,
+        userData.subscription_id || null,
+        userData.current_period_end || null
+      ]
+    );
+    
+    const userId = Number(result.insertId);
+    
+    // Return full user object
+    return {
+      id: userId,
+      name: userData.name || '',
+      email: userData.email,
+      country: userData.country || 'US',
+      is_pro: userData.is_pro || 0,
+      subscription_plan: userData.subscription_plan || 'free',
+      stripe_customer_id: userData.stripe_customer_id || null,
+      subscription_id: userData.subscription_id || null,
+      current_period_end: userData.current_period_end || null
+    };
+    
+  } catch (error) {
+    console.error('❌ User.create() error:', error);
+    throw error;
+  } finally {
+    if (conn) conn.release();
   }
+}
 
   // Find user by email
   static async findByEmail(email) {
@@ -106,53 +134,98 @@ class User {
   }
 
   // Update user
-  static async update(id, userData) {
-    let conn;
-    try {
-      conn = await pool.getConnection();
-      
-      let query = 'UPDATE users SET ';
-      const values = [];
-      const updates = [];
-      
-      if (userData.name) {
-        updates.push('name = ?');
-        values.push(userData.name);
-      }
-      
-      if (userData.email) {
-        updates.push('email = ?');
-        values.push(userData.email);
-      }
-      
-      if (userData.password) {
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(userData.password, salt);
-        updates.push('password = ?');
-        values.push(hashedPassword);
-      }
-      
-      if (userData.country) {
-        updates.push('country = ?');
-        values.push(userData.country);
-      }
-      
-      if (updates.length === 0) {
-        throw new Error('No fields to update');
-      }
-      
-      query += updates.join(', ') + ' WHERE id = ?';
-      values.push(id);
-      
-      await conn.query(query, values);
-      return true;
-      
-    } catch (error) {
-      throw error;
-    } finally {
-      if (conn) conn.release();
+// Update user - FIXED VERSION
+static async update(id, userData) {
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    
+    let query = 'UPDATE users SET ';
+    const values = [];
+    const updates = [];
+    
+    // Add ALL possible fields
+    if (userData.name !== undefined) {
+      updates.push('name = ?');
+      values.push(userData.name);
     }
+    
+    if (userData.email !== undefined) {
+      updates.push('email = ?');
+      values.push(userData.email);
+    }
+    
+    if (userData.password !== undefined) {
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(userData.password, salt);
+      updates.push('password = ?');
+      values.push(hashedPassword);
+    }
+    
+    if (userData.country !== undefined) {
+      updates.push('country = ?');
+      values.push(userData.country);
+    }
+    
+    // ADD THESE SUBSCRIPTION FIELDS:
+    if (userData.is_pro !== undefined) {
+      updates.push('is_pro = ?');
+      values.push(userData.is_pro);
+    }
+    
+    if (userData.subscription_plan !== undefined) {
+      updates.push('subscription_plan = ?');
+      values.push(userData.subscription_plan);
+    }
+    
+    if (userData.stripe_customer_id !== undefined) {
+      updates.push('stripe_customer_id = ?');
+      values.push(userData.stripe_customer_id);
+    }
+    
+    if (userData.subscription_id !== undefined) {
+      updates.push('subscription_id = ?');
+      values.push(userData.subscription_id);
+    }
+    
+    if (userData.current_period_end !== undefined) {
+      updates.push('current_period_end = ?');
+      values.push(userData.current_period_end);
+    }
+    
+    if (userData.reset_token !== undefined) {
+      updates.push('reset_token = ?');
+      values.push(userData.reset_token);
+    }
+    
+    if (userData.reset_token_expiry !== undefined) {
+      updates.push('reset_token_expiry = ?');
+      values.push(userData.reset_token_expiry);
+    }
+    
+    if (updates.length === 0) {
+      console.log('⚠️ No fields to update');
+      return false;
+    }
+    
+    query += updates.join(', ') + ' WHERE id = ?';
+    values.push(id);
+    
+    console.log('📝 Executing update query:', query);
+    console.log('📝 With values:', values);
+    
+    const result = await conn.query(query, values);
+    console.log('✅ Update affected rows:', result.affectedRows);
+    
+    return result.affectedRows > 0;
+    
+  } catch (error) {
+    console.error('❌ User.update() error:', error);
+    throw error;
+  } finally {
+    if (conn) conn.release();
   }
+}
 
   // Delete user
   static async delete(id) {

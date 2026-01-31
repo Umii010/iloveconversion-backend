@@ -74,21 +74,10 @@ class UserController {
       // Store user in session
       req.session.userId = user.id;
       req.session.userEmail = user.email;
-      
-      // Save session
       req.session.save((err) => {
         if (err) {
-          console.error('Session save error during registration:', err);
+          console.error('❌ Session save error during registration:', err);
         }
-      });
-
-      // Set HTTP-only cookie with additional security options
-      res.cookie('sessionId', req.sessionID, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        maxAge: 24 * 60 * 60 * 1000, // 24 hours
-        sameSite: 'strict',
-        path: '/'
       });
 
       const safeUserData = {
@@ -97,6 +86,9 @@ class UserController {
         email: user.email,
         country: user.country
       };
+
+      console.log('✅ User registered:', safeUserData.email);
+      console.log('🍪 Session ID after registration:', req.sessionID);
 
       res.status(201).json({
         success: true,
@@ -221,47 +213,56 @@ class UserController {
   }
 
   // Check authentication status
-static async checkAuthStatus(req, res) {
-  try {
-    if (!req.session.userId) {
-      return res.status(200).json({
-        success: true,
-        authenticated: false
-      });
-    }
-
-    const user = await User.getById(req.session.userId);
-    if (!user) {
-      // Clear invalid session
-      req.session.destroy();
-      res.clearCookie('sessionId');
-      res.clearCookie('connect.sid');
+  static async checkAuthStatus(req, res) {
+    try {
+      console.log('🔍 Auth status check - Session ID:', req.sessionID);
+      console.log('   User ID in session:', req.session.userId);
+      console.log('   Full session:', req.session);
       
-      return res.status(200).json({
+      if (!req.session.userId) {
+        console.log('   ❌ No user ID in session');
+        return res.status(200).json({
+          success: true,
+          authenticated: false,
+          message: 'No active session'
+        });
+      }
+
+      const user = await User.getById(req.session.userId);
+      if (!user) {
+        console.log('   ❌ User not found in database');
+        // Clear invalid session
+        req.session.destroy();
+        
+        return res.status(200).json({
+          success: true,
+          authenticated: false,
+          message: 'User not found'
+        });
+      }
+
+      console.log('   ✅ User authenticated:', user.email);
+      
+      res.status(200).json({
         success: true,
-        authenticated: false
+        authenticated: true,
+        user: {
+          id: Number(user.id),
+          name: user.name,
+          email: user.email,
+          country: user.country
+        }
+      });
+      
+    } catch (error) {
+      console.error('Auth status check error:', error);
+      res.status(200).json({
+        success: true,
+        authenticated: false,
+        message: 'Server error during auth check'
       });
     }
-
-    res.status(200).json({
-      success: true,
-      authenticated: true,
-      user: {
-        id: Number(user.id),
-        name: user.name,
-        email: user.email,
-        country: user.country
-      }
-    });
-    
-  } catch (error) {
-    console.error('Auth status check error:', error);
-    res.status(200).json({
-      success: true,
-      authenticated: false
-    });
   }
-}
 
   // Update user (protected)
   static async updateUser(req, res) {
@@ -363,8 +364,6 @@ static async checkAuthStatus(req, res) {
       // If user deleted their own account, destroy session
       if (req.session.userId === user.id) {
         req.session.destroy();
-        res.clearCookie('sessionId');
-        res.clearCookie('connect.sid');
       }
 
       res.status(200).json({
@@ -381,11 +380,15 @@ static async checkAuthStatus(req, res) {
     }
   }
 
-  // Login user
+  // Login user - FIXED VERSION
   static async login(req, res) {
     try {
-      const { email, password } = req.body;
+      console.log('➡️ Login API hit');
+      console.log('📦 Request body:', { email: req.body.email, password: '******' });
+      console.log('🍪 Incoming cookies:', req.headers.cookie);
+      console.log('🧾 Session before login:', req.session);
       
+      const { email, password } = req.body;
       if (!email || !password) {
         return res.status(400).json({
           success: false,
@@ -403,6 +406,8 @@ static async checkAuthStatus(req, res) {
       }
 
       const user = await User.findByEmail(email);
+      console.log('👤 User found:', user ? { ...user, password: '******' } : 'Not found');
+      
       if (!user) {
         return res.status(401).json({
           success: false,
@@ -411,6 +416,8 @@ static async checkAuthStatus(req, res) {
       }
 
       const isValidPassword = await User.verifyPassword(password, user.password);
+      console.log('🔑 Password valid?', isValidPassword);
+      
       if (!isValidPassword) {
         return res.status(401).json({
           success: false,
@@ -421,42 +428,45 @@ static async checkAuthStatus(req, res) {
       // Store user in session
       req.session.userId = user.id;
       req.session.userEmail = user.email;
-      // You could add admin check here if needed
-      // req.session.isAdmin = user.role === 'admin';
       
+      // Save session with callback
       req.session.save((err) => {
         if (err) {
-          console.error('Session save error during login:', err);
+          console.error('❌ Session save error during login:', err);
+          return res.status(500).json({
+            success: false,
+            error: 'Session error'
+          });
         }
-      });
+        
+        console.log('✅ Session saved successfully for user:', user.id);
+        console.log('🍪 Session ID:', req.sessionID);
+        console.log('📤 Sending success response...');
+        
+        const safeUserData = {
+          id: Number(user.id),
+          name: user.name,
+          email: user.email,
+          country: user.country
+        };
 
-      // Set HTTP-only cookie
-      res.cookie('sessionId', req.sessionID, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        maxAge: 24 * 60 * 60 * 1000, // 24 hours
-        sameSite: 'strict',
-        path: '/'
-      });
-
-      const safeUserData = {
-        id: Number(user.id),
-        name: user.name,
-        email: user.email,
-        country: user.country
-      };
-
-      res.status(200).json({
-        success: true,
-        message: 'Login successful',
-        data: safeUserData
+        res.status(200).json({
+          success: true,
+          message: 'Login successful',
+          data: safeUserData,
+          sessionInfo: {
+            sessionId: req.sessionID,
+            userId: user.id
+          }
+        });
       });
       
     } catch (error) {
       console.error('Login error:', error);
       res.status(500).json({
         success: false,
-        error: 'Server error. Please try again later.'
+        error: 'Server error. Please try again later.',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
   }
@@ -464,20 +474,23 @@ static async checkAuthStatus(req, res) {
   // Logout user
   static async logout(req, res) {
     try {
+      console.log('⬅️ Logout request for session:', req.sessionID);
+      
       // Destroy session
       req.session.destroy((err) => {
         if (err) {
           console.error('Session destruction error:', err);
+          return res.status(500).json({
+            success: false,
+            error: 'Failed to logout'
+          });
         }
-      });
-
-      // Clear all cookies
-      res.clearCookie('sessionId');
-      res.clearCookie('connect.sid');
-
-      res.status(200).json({
-        success: true,
-        message: 'Logout successful'
+        
+        console.log('✅ Session destroyed successfully');
+        res.status(200).json({
+          success: true,
+          message: 'Logout successful'
+        });
       });
       
     } catch (error) {
@@ -525,16 +538,16 @@ static async checkAuthStatus(req, res) {
       req.session.destroy((err) => {
         if (err) {
           console.error('Session destruction error:', err);
+          return res.status(500).json({
+            success: false,
+            error: 'Failed to logout'
+          });
         }
-      });
 
-      // Clear cookies
-      res.clearCookie('sessionId');
-      res.clearCookie('connect.sid');
-
-      res.status(200).json({
-        success: true,
-        message: 'All sessions logged out successfully'
+        res.status(200).json({
+          success: true,
+          message: 'All sessions logged out successfully'
+        });
       });
       
     } catch (error) {
@@ -560,8 +573,6 @@ static async checkAuthStatus(req, res) {
       if (!user) {
         // Clear invalid session
         req.session.destroy();
-        res.clearCookie('sessionId');
-        res.clearCookie('connect.sid');
         
         return res.status(404).json({
           success: false,
@@ -785,6 +796,18 @@ static async checkAuthStatus(req, res) {
       });
     }
     next();
+  }
+
+  // Debug session (for testing)
+  static debugSession(req, res) {
+    res.status(200).json({
+      sessionId: req.sessionID,
+      session: req.session,
+      cookies: req.cookies,
+      headers: {
+        cookie: req.headers.cookie
+      }
+    });
   }
 }
 
