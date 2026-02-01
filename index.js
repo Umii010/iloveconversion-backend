@@ -11,6 +11,10 @@ const { testConnection } = require('./config/database');
 const session = require('express-session');
 const sessionMiddleware = require('./middleware/session');
 const paymentRoutes = require('./routes/paymentRoutes');
+const webhookRoutes = require('./routes/webhooks');
+const subscriptionRoutes = require('./routes/subscription');
+
+
 
 
 dotenv.config();
@@ -92,6 +96,10 @@ app.use('/api/colors', colorRoutes);
 app.use('/api/design', designRoutes); 
 app.use('/api/heic', heicConverterRoutes);
 app.use('/api', paymentRoutes);
+app.use('/api', webhookRoutes);
+app.use('/api', subscriptionRoutes);
+
+
 
 
 

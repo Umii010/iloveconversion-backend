@@ -63,30 +63,37 @@ static async create(userData) {
 }
 
   // Find user by email
-  static async findByEmail(email) {
-    let conn;
-    try {
-      conn = await pool.getConnection();
-      const rows = await conn.query(
-        'SELECT * FROM users WHERE email = ?',
-        [email]
-      );
-      
-      if (rows[0] && rows[0].id) {
-        // Convert BigInt to Number
-        rows[0].id = Number(rows[0].id);
-        if (rows[0].reset_token_expiry) {
-          rows[0].reset_token_expiry = Number(rows[0].reset_token_expiry);
-        }
+  // Find user by email - FIXED VERSION
+static async findByEmail(email) {
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    const rows = await conn.query(
+      `SELECT 
+        id, name, email, password, country,
+        is_pro, subscription_plan,
+        stripe_customer_id, subscription_id, current_period_end,
+        created_at, updated_at,
+        reset_token, reset_token_expiry
+      FROM users WHERE email = ?`,
+      [email]
+    );
+    
+    if (rows[0] && rows[0].id) {
+      // Convert BigInt to Number
+      rows[0].id = Number(rows[0].id);
+      if (rows[0].reset_token_expiry) {
+        rows[0].reset_token_expiry = Number(rows[0].reset_token_expiry);
       }
-      
-      return rows[0];
-    } catch (error) {
-      throw error;
-    } finally {
-      if (conn) conn.release();
     }
+    
+    return rows[0];
+  } catch (error) {
+    throw error;
+  } finally {
+    if (conn) conn.release();
   }
+}
 
   // Get all users
   static async getAll() {
@@ -111,29 +118,38 @@ static async create(userData) {
   }
 
   // Get user by ID
-  static async getById(id) {
-    let conn;
-    try {
-      conn = await pool.getConnection();
-      const rows = await conn.query(
-        'SELECT id, name, email, country, created_at FROM users WHERE id = ?',
-        [id]
-      );
-      
-      if (rows[0] && rows[0].id) {
-        // Convert BigInt to Number
-        rows[0].id = Number(rows[0].id);
+  // Get user by ID - FIXED VERSION
+static async getById(id) {
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    const rows = await conn.query(
+      `SELECT 
+        id, name, email, password, country,
+        is_pro, subscription_plan,
+        stripe_customer_id, subscription_id, current_period_end,
+        created_at, updated_at,
+        reset_token, reset_token_expiry
+      FROM users WHERE id = ?`,
+      [id]
+    );
+    
+    if (rows[0] && rows[0].id) {
+      // Convert BigInt to Number
+      rows[0].id = Number(rows[0].id);
+      if (rows[0].reset_token_expiry) {
+        rows[0].reset_token_expiry = Number(rows[0].reset_token_expiry);
       }
-      
-      return rows[0];
-    } catch (error) {
-      throw error;
-    } finally {
-      if (conn) conn.release();
     }
+    
+    return rows[0];
+  } catch (error) {
+    throw error;
+  } finally {
+    if (conn) conn.release();
   }
+}
 
-  // Update user
 // Update user - FIXED VERSION
 static async update(id, userData) {
   let conn;
@@ -202,6 +218,23 @@ static async update(id, userData) {
       updates.push('reset_token_expiry = ?');
       values.push(userData.reset_token_expiry);
     }
+    if (userData.subscription_status !== undefined) {
+  updates.push('subscription_status = ?');
+  values.push(userData.subscription_status);
+}
+  if (userData.last_payment_at !== undefined) {
+  updates.push('last_payment_at = ?');
+  values.push(userData.last_payment_at);
+}
+
+  if (userData.last_payment_failed_at !== undefined) {
+  updates.push('last_payment_failed_at = ?');
+  values.push(userData.last_payment_failed_at);
+}
+  if (userData.subscription_cancelled_at !== undefined) {
+  updates.push('subscription_cancelled_at = ?');
+  values.push(userData.subscription_cancelled_at);
+}
     
     if (updates.length === 0) {
       console.log('⚠️ No fields to update');
@@ -361,6 +394,29 @@ static async update(id, userData) {
       if (conn) conn.release();
     }
   }
+
+// Add this method to User.js
+static async findByStripeCustomerId(customerId) {
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    const rows = await conn.query(
+      'SELECT * FROM users WHERE stripe_customer_id = ?',
+      [customerId]
+    );
+    
+    if (rows[0] && rows[0].id) {
+      rows[0].id = Number(rows[0].id);
+    }
+    
+    return rows[0];
+  } catch (error) {
+    throw error;
+  } finally {
+    if (conn) conn.release();
+  }
+}
+
 }
 
 module.exports = User;
