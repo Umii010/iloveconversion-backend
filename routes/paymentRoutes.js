@@ -279,33 +279,20 @@ router.post('/update-subscription-from-session', async (req, res) => {
     
     if (user) {
       console.log('👤 Updating existing user:', user.email);
-      
-    await User.update(user.id, {
-  is_pro: isPro,
-  subscription_plan: subscriptionPlan,
-  stripe_customer_id: subscription.customer,
-  subscription_id: subscriptionId,
-  subscription_status: subscription.status,
+        const customerId = typeof subscription.customer === 'string' 
+    ? subscription.customer 
+    : subscription.customer.id;
 
-  last_payment_at:
-    subscription.status === 'active' || subscription.status === 'trialing'
-      ? new Date(subscription.current_period_start * 1000)
-      : null,
-
-  last_payment_failed_at:
-    subscription.status === 'past_due' || subscription.status === 'unpaid'
-      ? new Date()
-      : null,
-
-  subscription_cancelled_at:
-    subscription.canceled_at
-      ? new Date(subscription.canceled_at * 1000)
-      : null,
-
-  current_period_end: subscription.current_period_end
-    ? new Date(subscription.current_period_end * 1000)
-    : calculateFallbackExpiry(plan)
-});
+      await User.update(user.id, {
+    is_pro: isPro,
+    subscription_plan: subscriptionPlan,
+    subscription_status: subscription.status,
+    stripe_customer_id: customerId, // ← Store only ID, not object
+    subscription_id: subscriptionId,
+    current_period_end: subscription.current_period_end 
+      ? new Date(subscription.current_period_end * 1000)
+      : calculateFallbackExpiry(plan)
+  });
 
       
       console.log('✅ User updated successfully');
@@ -458,6 +445,73 @@ async function updateUserFromSubscription(subscription) {
     console.error('❌ Update user from subscription error:', error);
   }
 }
+// Fix broken customer IDs endpoint
+router.post('/fix-customer-ids', async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const user = await User.getById(userId);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    console.log('🔧 Current stripe_customer_id:', user.stripe_customer_id);
+    
+    let customerId = user.stripe_customer_id;
+    
+    // If it's a JSON string, extract the ID
+    if (customerId && customerId.includes('{"id":"')) {
+      try {
+        const customerObj = JSON.parse(customerId);
+        customerId = customerObj.id;
+        console.log('📝 Extracted customer ID:', customerId);
+      } catch (e) {
+        console.warn('⚠️ Could not parse as JSON:', e.message);
+      }
+    }
+    
+    // If it's still broken, get from Stripe
+    if (!customerId || customerId.length > 50) {
+      console.log('🔄 Getting customer ID from Stripe subscription...');
+      
+      if (user.subscription_id) {
+        const subscription = await stripe.subscriptions.retrieve(user.subscription_id);
+        customerId = subscription.customer;
+        console.log('✅ Got customer ID from Stripe:', customerId);
+      }
+    }
+    
+    // Update user with clean customer ID
+    if (customerId && customerId.startsWith('cus_')) {
+      await User.update(user.id, {
+        stripe_customer_id: customerId
+      });
+      
+      console.log('✅ Fixed customer ID in database');
+      
+      res.json({
+        success: true,
+        message: 'Customer ID fixed',
+        customerId: customerId
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        error: 'Invalid customer ID format'
+      });
+    }
+    
+  } catch (error) {
+    console.error('Fix customer IDs error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
 router.post('/create-checkout-session', async (req, res) => {
   try {
     const { plan, billingInfo } = req.body;
@@ -618,14 +672,16 @@ router.post('/update-subscription-status', async (req, res) => {
     
     if (user) {
       console.log('🔄 Updating existing user...');
-      
+       const customerId = typeof updatedSubscription.customer === 'string'
+    ? updatedSubscription.customer
+    : updatedSubscription.customer.id;
       await User.update(user.id, {
-        is_pro: isPro,
-        subscription_plan: subscriptionPlan,
-        stripe_customer_id: updatedSubscription.customer,
-        subscription_id: updatedSubscription.id,
-        current_period_end: currentPeriodEnd
-      });
+    is_pro: isPro,
+    subscription_plan: subscriptionPlan,
+    stripe_customer_id: customerId, // ← Only ID
+    subscription_id: updatedSubscription.id,
+    current_period_end: currentPeriodEnd
+  });
       
       console.log('✅ User updated in database');
       
@@ -742,5 +798,86 @@ router.get('/subscription-status/:email', async (req, res) => {
     });
   }
 });
+
+// Add webhook endpoint for subscription updates
+router.post('/stripe-webhook', express.raw({type: 'application/json'}), async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(
+      req.body,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
+  } catch (err) {
+    console.error('❌ Webhook signature verification failed:', err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  console.log('🎯 Webhook received:', event.type);
+
+  // Handle subscription cancellation events
+  switch (event.type) {
+    case 'customer.subscription.updated':
+      const subscription = event.data.object;
+      console.log('📅 Subscription updated via webhook:', {
+        id: subscription.id,
+        status: subscription.status,
+        cancel_at_period_end: subscription.cancel_at_period_end,
+        cancel_at: subscription.cancel_at
+      });
+
+      // Find user by subscription ID
+      const user = await User.findBySubscriptionId(subscription.id);
+      
+      if (user) {
+        console.log('👤 Found user for subscription:', user.email);
+        
+        // Update user based on subscription status
+        const updates = {
+          subscription_status: subscription.status,
+          cancel_at_period_end: subscription.cancel_at_period_end,
+          cancel_at: subscription.cancel_at ? new Date(subscription.cancel_at * 1000) : null
+        };
+        
+        // If cancelled at period end, keep is_pro as 1 until expiry
+        if (subscription.cancel_at_period_end) {
+          updates.is_pro = 1;
+          console.log('✅ Subscription will cancel at period end, keeping Pro access');
+        } 
+        // If fully cancelled, mark as not pro
+        else if (subscription.status === 'canceled') {
+          updates.is_pro = 0;
+          updates.current_period_end = null;
+          console.log('❌ Subscription fully cancelled, removing Pro access');
+        }
+        
+        await User.update(user.id, updates);
+        console.log('✅ User updated via webhook');
+      }
+      break;
+
+    case 'customer.subscription.deleted':
+      const deletedSubscription = event.data.object;
+      console.log('🗑️ Subscription deleted:', deletedSubscription.id);
+      
+      const deletedUser = await User.findBySubscriptionId(deletedSubscription.id);
+      if (deletedUser) {
+        await User.update(deletedUser.id, {
+          is_pro: 0,
+          subscription_status: 'canceled',
+          current_period_end: null,
+          cancel_at_period_end: false,
+          cancel_at: null
+        });
+        console.log('✅ User downgraded after subscription deletion');
+      }
+      break;
+  }
+
+  res.json({ received: true });
+});
+
 
 module.exports = router;

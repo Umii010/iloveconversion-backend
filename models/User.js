@@ -62,7 +62,27 @@ static async create(userData) {
   }
 }
 
-  // Find user by email
+// Add this method to your User model:
+static async findBySubscriptionId(subscriptionId) {
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    const rows = await conn.query(
+      'SELECT * FROM users WHERE subscription_id = ?',
+      [subscriptionId]
+    );
+    
+    if (rows[0] && rows[0].id) {
+      rows[0].id = Number(rows[0].id);
+    }
+    
+    return rows[0];
+  } catch (error) {
+    throw error;
+  } finally {
+    if (conn) conn.release();
+  }
+}
   // Find user by email - FIXED VERSION
 static async findByEmail(email) {
   let conn;

@@ -49,19 +49,21 @@ router.get('/subscription', async (req, res) => {
         
         // Update with Stripe data if successful
         subscriptionData = {
-          ...subscriptionData,
-          status: subscription.status,
-          currentPeriodEnd: subscription.current_period_end ? 
-                           new Date(subscription.current_period_end * 1000) : 
-                           user.current_period_end, // ← Fallback to DB value
-          cancelAtPeriodEnd: subscription.cancel_at_period_end,
-          cancelAt: subscription.cancel_at ? new Date(subscription.cancel_at * 1000) : null,
-          // Update amount and period from Stripe
-          amount: subscription.items.data[0]?.price.unit_amount ? 
-                 `$${(subscription.items.data[0]?.price.unit_amount / 100).toFixed(2)}` : 
-                 subscriptionData.amount,
-          period: subscription.items.data[0]?.price.recurring?.interval || subscriptionData.period
-        };
+      ...subscriptionData,
+      status: subscription.status,
+      currentPeriodEnd: subscription.current_period_end 
+        ? new Date(subscription.current_period_end * 1000)
+        : user.current_period_end,
+      cancelAtPeriodEnd: subscription.cancel_at_period_end,  // ← This is critical!
+      cancelAt: subscription.cancel_at 
+        ? new Date(subscription.cancel_at * 1000)
+        : null,
+      // Update amount and period from Stripe
+      amount: subscription.items.data[0]?.price.unit_amount 
+        ? `$${(subscription.items.data[0]?.price.unit_amount / 100).toFixed(2)}`
+        : subscriptionData.amount,
+      period: subscription.items.data[0]?.price.recurring?.interval || subscriptionData.period
+    };
       } catch (stripeError) {
         console.warn('❌ Stripe subscription not found, using database values:', stripeError.message);
         // Keep database values when Stripe fails
@@ -160,30 +162,78 @@ router.post('/change-plan', async (req, res) => {
 
     // Update subscription with new price
     console.log('⚙️ Updating subscription with new price...');
-    const updatedSubscription = await stripe.subscriptions.update(
-      user.subscription_id,
-      {
-        items: [{
-          id: subscription.items.data[0].id,
-          price: priceId,
-        }],
-        proration_behavior: 'create_prorations',
-      }
-    );
+   // In your change-plan endpoint, update this section:
+const updatedSubscription = await stripe.subscriptions.update(
+  user.subscription_id,
+  {
+    items: [{
+      id: subscription.items.data[0].id,
+      price: priceId,
+    }],
+    proration_behavior: 'create_prorations',
+  }
+);
 
-    console.log('✅ Subscription updated:', {
-      id: updatedSubscription.id,
-      status: updatedSubscription.status,
-      current_period_end: updatedSubscription.current_period_end,
-      new_price: updatedSubscription.items.data[0]?.price.id
-    });
+console.log('✅ Subscription updated:', {
+  id: updatedSubscription.id,
+  status: updatedSubscription.status,
+  current_period_end: updatedSubscription.current_period_end,
+  new_price: updatedSubscription.items.data[0]?.price.id
+});
+
+// FIX: Handle undefined current_period_end
+let newExpiryDate;
+if (updatedSubscription.current_period_end) {
+  // Use Stripe's current_period_end if available
+  newExpiryDate = new Date(updatedSubscription.current_period_end * 1000);
+} else if (user.current_period_end) {
+  // If user already has a date, calculate based on plan change
+  newExpiryDate = new Date(user.current_period_end);
+  
+  // Update expiry based on plan change direction
+  if (newPlan === 'yearly' && user.subscription_plan === 'monthly') {
+    // Monthly → Yearly: Add 11 months (keeping 1 month already used)
+    newExpiryDate.setMonth(newExpiryDate.getMonth() + 11);
+  } else if (newPlan === 'monthly' && user.subscription_plan === 'yearly') {
+    // Yearly → Monthly: Calculate prorated expiry
+    const daysUsed = Math.floor((new Date() - new Date(user.current_period_end)) / (1000 * 60 * 60 * 24));
+    const daysRemaining = 365 - daysUsed;
+    const monthsRemaining = Math.floor(daysRemaining / 30);
+    newExpiryDate = new Date();
+    newExpiryDate.setMonth(newExpiryDate.getMonth() + Math.max(1, monthsRemaining));
+  }
+} else {
+  // No existing date, set default
+  newExpiryDate = new Date();
+  if (newPlan === 'yearly') {
+    newExpiryDate.setFullYear(newExpiryDate.getFullYear() + 1);
+  } else {
+    newExpiryDate.setMonth(newExpiryDate.getMonth() + 1);
+  }
+}
+
+console.log('📅 Calculated expiry date:', newExpiryDate);
+
+// Update user in database
+console.log('💾 Updating user in database...');
+await User.update(user.id, {
+  subscription_plan: newPlan,
+  current_period_end: newExpiryDate
+});
+
+    // console.log('✅ Subscription updated:', {
+    //   id: updatedSubscription.id,
+    //   status: updatedSubscription.status,
+    //   current_period_end: updatedSubscription.current_period_end,
+    //   new_price: updatedSubscription.items.data[0]?.price.id
+    // });
 
     // Update user in database
-    console.log('💾 Updating user in database...');
-    await User.update(user.id, {
-      subscription_plan: newPlan,
-      current_period_end: new Date(updatedSubscription.current_period_end * 1000)
-    });
+    // console.log('💾 Updating user in database...');
+    // await User.update(user.id, {
+    //   subscription_plan: newPlan,
+    //   current_period_end: new Date(updatedSubscription.current_period_end * 1000)
+    // });
 
     console.log('✅ Plan change completed successfully');
     
