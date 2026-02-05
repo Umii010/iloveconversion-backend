@@ -24,8 +24,8 @@ static async create(userData) {
       `INSERT INTO users (
         name, email, password, country, 
         is_pro, subscription_plan, 
-        stripe_customer_id, subscription_id, current_period_end
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        stripe_customer_id, subscription_id, current_period_end, cancel_at_period_end, cancel_at,subscription_status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         userData.name || '',
         userData.email,
@@ -35,7 +35,10 @@ static async create(userData) {
         userData.subscription_plan || 'free',
         userData.stripe_customer_id || null,
         userData.subscription_id || null,
-        userData.current_period_end || null
+        userData.current_period_end || null,
+        userData.cancel_at_period_end || false,
+        userData.cancel_at || null, 
+        userData.subscription_status || 'active'
       ]
     );
     
@@ -171,6 +174,7 @@ static async getById(id) {
 }
 
 // Update user - FIXED VERSION
+// In User.js, update the update method to include ALL subscription fields
 static async update(id, userData) {
   let conn;
   try {
@@ -180,81 +184,32 @@ static async update(id, userData) {
     const values = [];
     const updates = [];
     
-    // Add ALL possible fields
-    if (userData.name !== undefined) {
-      updates.push('name = ?');
-      values.push(userData.name);
-    }
+    // Add ALL subscription-related fields
+    const subscriptionFields = [
+      'is_pro', 'subscription_plan', 'stripe_customer_id', 
+      'subscription_id', 'current_period_end', 'subscription_status',
+      'cancel_at_period_end', 'cancel_at', 'last_payment_at',
+      'last_payment_failed_at', 'subscription_cancelled_at'
+    ];
     
-    if (userData.email !== undefined) {
-      updates.push('email = ?');
-      values.push(userData.email);
-    }
+    // Check each subscription field
+    subscriptionFields.forEach(field => {
+      if (userData[field] !== undefined) {
+        updates.push(`${field} = ?`);
+        values.push(userData[field]);
+        console.log(`📝 Adding ${field}:`, userData[field]);
+      }
+    });
     
-    if (userData.password !== undefined) {
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(userData.password, salt);
-      updates.push('password = ?');
-      values.push(hashedPassword);
-    }
-    
-    if (userData.country !== undefined) {
-      updates.push('country = ?');
-      values.push(userData.country);
-    }
-    
-    // ADD THESE SUBSCRIPTION FIELDS:
-    if (userData.is_pro !== undefined) {
-      updates.push('is_pro = ?');
-      values.push(userData.is_pro);
-    }
-    
-    if (userData.subscription_plan !== undefined) {
-      updates.push('subscription_plan = ?');
-      values.push(userData.subscription_plan);
-    }
-    
-    if (userData.stripe_customer_id !== undefined) {
-      updates.push('stripe_customer_id = ?');
-      values.push(userData.stripe_customer_id);
-    }
-    
-    if (userData.subscription_id !== undefined) {
-      updates.push('subscription_id = ?');
-      values.push(userData.subscription_id);
-    }
-    
-    if (userData.current_period_end !== undefined) {
-      updates.push('current_period_end = ?');
-      values.push(userData.current_period_end);
-    }
-    
-    if (userData.reset_token !== undefined) {
-      updates.push('reset_token = ?');
-      values.push(userData.reset_token);
-    }
-    
-    if (userData.reset_token_expiry !== undefined) {
-      updates.push('reset_token_expiry = ?');
-      values.push(userData.reset_token_expiry);
-    }
-    if (userData.subscription_status !== undefined) {
-  updates.push('subscription_status = ?');
-  values.push(userData.subscription_status);
-}
-  if (userData.last_payment_at !== undefined) {
-  updates.push('last_payment_at = ?');
-  values.push(userData.last_payment_at);
-}
-
-  if (userData.last_payment_failed_at !== undefined) {
-  updates.push('last_payment_failed_at = ?');
-  values.push(userData.last_payment_failed_at);
-}
-  if (userData.subscription_cancelled_at !== undefined) {
-  updates.push('subscription_cancelled_at = ?');
-  values.push(userData.subscription_cancelled_at);
-}
+    // Also include basic user fields
+    const basicFields = ['name', 'email', 'password', 'country', 'reset_token', 'reset_token_expiry'];
+    basicFields.forEach(field => {
+      if (userData[field] !== undefined) {
+        updates.push(`${field} = ?`);
+        values.push(userData[field]);
+        console.log(`📝 Adding ${field}:`, userData[field]);
+      }
+    });
     
     if (updates.length === 0) {
       console.log('⚠️ No fields to update');
@@ -264,7 +219,7 @@ static async update(id, userData) {
     query += updates.join(', ') + ' WHERE id = ?';
     values.push(id);
     
-    console.log('📝 Executing update query:', query);
+    console.log('📝 Final update query:', query);
     console.log('📝 With values:', values);
     
     const result = await conn.query(query, values);
