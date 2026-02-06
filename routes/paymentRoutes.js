@@ -3,6 +3,8 @@ const router = express.Router();
 const Stripe = require('stripe');
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 const User = require('../models/User'); 
+const emailService = require('../services/emailService');
+
 
 
 router.post('/fix-incomplete-subscription', async (req, res) => {
@@ -243,103 +245,170 @@ router.get('/retrieve-checkout-session', async (req, res) => {
   }
 });
 
-// Update subscription from checkout session
+// In paymentRoutes.js - Make the endpoint more robust
 router.post('/update-subscription-from-session', async (req, res) => {
   try {
-    const { sessionId, subscriptionId, customerEmail, plan, amount } = req.body;
+    let { sessionId, subscriptionId, customerEmail, plan, amount, paymentData } = req.body;
     
     console.log('🔄 Updating subscription from session:', {
       sessionId,
       subscriptionId,
       customerEmail,
-      plan
+      plan,
+      amount,
+      hasPaymentData: !!paymentData
     });
-
-    // 1. Retrieve subscription from Stripe
-    const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
-      expand: ['customer', 'latest_invoice.payment_intent']
-    });
-
-    console.log('📊 Stripe subscription:', {
-      status: subscription.status,
-      customer: subscription.customer.id,
-      current_period_end: subscription.current_period_end
-    });
-
-    // 2. Find or create user
+    
+    // Support both old and new data formats
+    if (paymentData) {
+      sessionId = paymentData.id;
+      subscriptionId = paymentData.subscriptionId;
+      customerEmail = paymentData.customerEmail;
+      plan = paymentData.plan;
+      amount = paymentData.amount;
+    }
+    
+    // Validate required fields
+    if (!customerEmail) {
+      return res.status(400).json({
+        success: false,
+        error: 'Customer email is required'
+      });
+    }
+    
+    // If no subscriptionId, try to get from Stripe
+    if (!subscriptionId && sessionId) {
+      try {
+        const session = await stripe.checkout.sessions.retrieve(sessionId, {
+          expand: ['subscription']
+        });
+        subscriptionId = session.subscription?.id;
+      } catch (stripeError) {
+        console.warn('⚠️ Could not retrieve session from Stripe:', stripeError.message);
+      }
+    }
+    
+    // 1. Find user by email
     let user = await User.findByEmail(customerEmail);
     
     if (!user) {
-      // Try to find by Stripe customer ID
-      user = await User.findByStripeCustomerId(subscription.customer);
+      // Try to find by Stripe customer ID if we have one
+      if (subscriptionId) {
+        try {
+          const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+          const customerId = typeof subscription.customer === 'string' 
+            ? subscription.customer 
+            : subscription.customer.id;
+          
+          user = await User.findByStripeCustomerId(customerId);
+          
+          if (user) {
+            console.log('👤 Found user by Stripe customer ID:', user.email);
+          }
+        } catch (error) {
+          console.warn('⚠️ Could not retrieve subscription:', error.message);
+        }
+      }
     }
-
-    const isPro = subscription.status === 'active' ? 1 : 0;
-    const subscriptionPlan = plan === 'yearly' ? 'yearly' : 'monthly';
     
-    if (user) {
-      console.log('👤 Updating existing user:', user.email);
-        const customerId = typeof subscription.customer === 'string' 
-    ? subscription.customer 
-    : subscription.customer.id;
-
-      await User.update(user.id, {
-    is_pro: isPro,
-    subscription_plan: subscriptionPlan,
-    subscription_status: subscription.status,
-    stripe_customer_id: customerId, // ← Store only ID, not object
-    subscription_id: subscriptionId,
-    current_period_end: subscription.current_period_end 
-      ? new Date(subscription.current_period_end * 1000)
-      : calculateFallbackExpiry(plan)
-  });
-
+    if (!user) {
+      console.log('👤 User not found, creating new user...');
       
-      console.log('✅ User updated successfully');
+      // Get customer from Stripe
+      let customer;
+      if (subscriptionId) {
+        try {
+          const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+          const customerId = typeof subscription.customer === 'string' 
+            ? subscription.customer 
+            : subscription.customer.id;
+          
+          customer = await stripe.customers.retrieve(customerId);
+        } catch (error) {
+          console.warn('⚠️ Could not retrieve customer:', error.message);
+        }
+      }
       
-    } else {
-      console.log('👤 Creating new user...');
-      
-      // Get customer details
-      const customer = typeof subscription.customer === 'string' 
-        ? await stripe.customers.retrieve(subscription.customer)
-        : subscription.customer;
-      
+      // Create new user
       user = await User.create({
-        name: customer.name || customerEmail.split('@')[0],
+        name: customer?.name || customerEmail.split('@')[0],
         email: customerEmail,
         password: Math.random().toString(36).slice(-8),
         country: 'US',
-        is_pro: isPro,
-        subscription_plan: subscriptionPlan,
-        stripe_customer_id: subscription.customer,
+        is_pro: 1,
+        subscription_plan: plan || 'monthly',
+        stripe_customer_id: customer?.id,
         subscription_id: subscriptionId,
-        current_period_end: subscription.current_period_end 
-          ? new Date(subscription.current_period_end * 1000)
-          : calculateFallbackExpiry(plan)
+        current_period_end: calculateFallbackExpiry(plan)
       });
       
       console.log('✅ New user created:', user.id);
+      
+    } else {
+      console.log('👤 Updating existing user:', user.email);
+      
+      // Get subscription details if we have subscriptionId
+      let currentPeriodEnd = calculateFallbackExpiry(plan);
+      let stripeCustomerId = user.stripe_customer_id;
+      
+      if (subscriptionId) {
+        try {
+          const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+          currentPeriodEnd = subscription.current_period_end 
+            ? new Date(subscription.current_period_end * 1000)
+            : calculateFallbackExpiry(plan);
+          
+          stripeCustomerId = typeof subscription.customer === 'string' 
+            ? subscription.customer 
+            : subscription.customer.id;
+        } catch (error) {
+          console.warn('⚠️ Could not retrieve subscription details:', error.message);
+        }
+      }
+      
+      // Update user
+      await User.update(user.id, {
+        is_pro: 1,
+        subscription_plan: plan || 'monthly',
+        subscription_status: 'active',
+        stripe_customer_id: stripeCustomerId,
+        subscription_id: subscriptionId,
+        current_period_end: currentPeriodEnd
+      });
+      
+      console.log('✅ User updated successfully');
     }
-
+    
+    // Send confirmation email
+    if (user) {
+      try {
+        await emailService.sendSubscriptionEmails('subscription_purchased', {
+          id: user.id,
+          name: user.name,
+          email: user.email
+        }, {
+          planName: plan === 'yearly' ? 'Pro Yearly' : 'Pro Monthly',
+          name: plan === 'yearly' ? 'Pro Yearly' : 'Pro Monthly',
+          amount: plan === 'yearly' ? '$199.99/year' : '$19.99/month',
+          currentPeriodEnd: user.current_period_end || calculateFallbackExpiry(plan),
+          period: plan === 'yearly' ? 'year' : 'month'
+        });
+      } catch (emailError) {
+        console.warn('⚠️ Could not send confirmation email:', emailError.message);
+      }
+    }
+    
     res.json({
       success: true,
       message: 'Subscription updated successfully',
-      subscription: {
-        id: subscriptionId,
-        status: subscription.status,
-        currentPeriodEnd: subscription.current_period_end 
-          ? new Date(subscription.current_period_end * 1000)
-          : null
-      },
       user: {
         id: user.id,
         email: user.email,
-        isPro: isPro,
-        plan: subscriptionPlan
+        isPro: true,
+        plan: plan || 'monthly'
       }
     });
-
+    
   } catch (error) {
     console.error('❌ Update subscription from session error:', error);
     res.status(500).json({
@@ -512,7 +581,14 @@ router.post('/fix-customer-ids', async (req, res) => {
     });
   }
 });
-router.post('/create-checkout-session', async (req, res) => {
+function generateSecureToken() {
+  const crypto = require('crypto');
+  return crypto.randomBytes(32).toString('hex');
+}
+
+const paymentTokens = new Map();
+
+router.post('/create-secure-checkout-session', async (req, res) => {
   try {
     const { plan, billingInfo } = req.body;
     
@@ -520,6 +596,13 @@ router.post('/create-checkout-session', async (req, res) => {
     const priceId = plan === 'yearly' 
       ? process.env.STRIPE_YEARLY_PRICE_ID 
       : process.env.STRIPE_MONTHLY_PRICE_ID;
+
+    if (!priceId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Price not configured'
+      });
+    }
 
     // Create or get customer
     let customerId;
@@ -539,6 +622,21 @@ router.post('/create-checkout-session', async (req, res) => {
       }
     }
 
+    // Generate verification token
+    const verificationToken = generateSecureToken();
+    const tokenExpiry = Date.now() + 30 * 60 * 1000; // 30 minutes
+    
+    // Store token in memory
+    paymentTokens.set(verificationToken, {
+      email: billingInfo.email,
+      plan: plan,
+      customerId: customerId,
+      expiry: tokenExpiry,
+      used: false
+    });
+
+    console.log(`🔐 Generated verification token: ${verificationToken.substring(0, 10)}...`);
+
     // Create checkout session
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -548,25 +646,181 @@ router.post('/create-checkout-session', async (req, res) => {
         price: priceId,
         quantity: 1,
       }],
-      success_url: `${process.env.FRONTEND_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}&plan=${plan}`,
-      cancel_url: `${process.env.FRONTEND_URL}/payment?plan=${plan}`,
+      // Remove sensitive data from URL
+      success_url: `${process.env.FRONTEND_URL}/payment/success`,
+      cancel_url: `${process.env.FRONTEND_URL}/payment/cancel?plan=${plan}`,
       metadata: {
+        verificationToken: verificationToken,
         plan: plan,
         userEmail: billingInfo.email
-      }
+      },
+      expires_at: Math.floor(Date.now() / 1000) + 1800 // 30 minutes
     });
 
     res.json({
       success: true,
-      sessionId: session.id,
-      url: session.url
+      url: session.url,
+      verificationToken: verificationToken,
+      sessionId: session.id
     });
 
   } catch (error) {
-    console.error('Checkout session error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    console.error('Secure checkout session error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
   }
 });
+// In paymentRoutes.js - Update the verify-payment endpoint
+router.post('/verify-payment', async (req, res) => {
+  try {
+    const { verificationToken, stripeSessionId } = req.body;
+    
+    console.log('🔍 Verifying payment with token:', verificationToken ? verificationToken.substring(0, 10) + '...' : 'none');
+    
+    let sessionData;
+    let tokenData;
+    
+    // Method 1: Verify using verification token (preferred)
+    if (verificationToken) {
+      tokenData = paymentTokens.get(verificationToken);
+      
+      if (!tokenData) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid or expired verification token'
+        });
+      }
+      
+      if (tokenData.used) {
+        return res.status(400).json({
+          success: false,
+          error: 'Token already used'
+        });
+      }
+      
+      if (tokenData.expiry < Date.now()) {
+        paymentTokens.delete(verificationToken);
+        return res.status(400).json({
+          success: false,
+          error: 'Token expired'
+        });
+      }
+      
+      // Mark token as used
+      tokenData.used = true;
+      paymentTokens.set(verificationToken, tokenData);
+      
+      // Get latest Stripe session for this customer
+      const sessions = await stripe.checkout.sessions.list({
+        customer: tokenData.customerId,
+        limit: 1,
+        status: 'complete'
+      });
+      
+      if (sessions.data.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'No completed payment session found'
+        });
+      }
+      
+      sessionData = sessions.data[0];
+      
+    } 
+    // Method 2: Verify using Stripe session ID (fallback)
+    else if (stripeSessionId) {
+      sessionData = await stripe.checkout.sessions.retrieve(stripeSessionId, {
+        expand: ['subscription', 'customer']
+      });
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: 'Verification token or session ID required'
+      });
+    }
+    
+    // Check if payment was successful
+    if (sessionData.payment_status !== 'paid' && sessionData.status !== 'complete') {
+      return res.status(400).json({
+        success: false,
+        error: 'Payment not completed'
+      });
+    }
+    
+    // Get session metadata
+    const metadata = sessionData.metadata || {};
+    const plan = metadata.plan || 'monthly';
+    const userEmail = metadata.userEmail || sessionData.customer_details?.email;
+    
+    if (!userEmail) {
+      return res.status(400).json({
+        success: false,
+        error: 'Unable to identify customer'
+      });
+    }
+    
+    // IMPORTANT: Get subscription ID if available
+    let subscriptionId = sessionData.subscription;
+    
+    // If subscription is an object (from expand), get the ID
+    if (subscriptionId && typeof subscriptionId === 'object') {
+      subscriptionId = subscriptionId.id;
+    }
+    
+    // Get customer ID
+    let customerId = sessionData.customer;
+    if (customerId && typeof customerId === 'object') {
+      customerId = customerId.id;
+    }
+    
+    // Return data in format expected by update-subscription-from-session
+    const responseData = {
+      success: true,
+      session: {
+        id: sessionData.id,
+        status: sessionData.status,
+        subscriptionId: subscriptionId,
+        paymentIntentId: sessionData.payment_intent,
+        customerId: customerId,
+        customerEmail: userEmail,
+        amount: sessionData.amount_total ? sessionData.amount_total / 100 : (plan === 'yearly' ? 199.99 : 19.99),
+        plan: plan,
+        subscriptionStatus: 'active',
+        currentPeriodEnd: sessionData.subscription?.current_period_end 
+          ? new Date(sessionData.subscription.current_period_end * 1000)
+          : null
+      }
+    };
+    
+    console.log('✅ Payment verified successfully:', {
+      email: userEmail,
+      plan: plan,
+      subscriptionId: subscriptionId,
+      amount: responseData.session.amount
+    });
+    
+    res.json(responseData);
+    
+  } catch (error) {
+    console.error('❌ Verify payment error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+function cleanupExpiredTokens() {
+  const now = Date.now();
+  for (const [token, data] of paymentTokens.entries()) {
+    if (data.expiry < now) {
+      paymentTokens.delete(token);
+    }
+  }
+}
+setInterval(cleanupExpiredTokens, 60 * 60 * 1000);
+
 // Webhook endpoint
 router.post('/webhook', async (req, res) => {
   const sig = req.headers['stripe-signature'];
@@ -746,12 +1000,18 @@ router.post('/confirm-subscription', async (req, res) => {
   try {
     const { transactionId, plan, customerEmail } = req.body;
     
-    // Update user in database
     const user = await User.findByEmail(customerEmail);
     if (user) {
       await User.update(user.id, {
         is_pro: 1,
         subscription_plan: plan
+      });
+       emailService.sendSubscriptionEmails('subscription_purchased', user, {
+        planName: plan === 'yearly' ? 'Pro Yearly' : 'Pro Monthly',
+        name: plan === 'yearly' ? 'Pro Yearly' : 'Pro Monthly',
+        amount: plan === 'yearly' ? '$199.99/year' : '$19.99/month',
+        currentPeriodEnd: new Date(Date.now() + (plan === 'yearly' ? 365 : 30) * 24 * 60 * 60 * 1000),
+        period: plan === 'yearly' ? 'year' : 'month'
       });
     }
 

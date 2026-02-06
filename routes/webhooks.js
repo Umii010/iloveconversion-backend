@@ -1,9 +1,10 @@
-// webhooks.js
 const express = require('express');
 const router = express.Router();
 const Stripe = require('stripe');
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 const User = require('../models/User');
+const emailService = require('../services/emailService');
+
 
 // Stripe webhook endpoint
 router.post('/stripe-webhook', express.raw({type: 'application/json'}), async (req, res) => {
@@ -44,13 +45,27 @@ router.post('/stripe-webhook', express.raw({type: 'application/json'}), async (r
         // Determine status
         let subscriptionStatus = subscription.status;
         let cancelAtPeriodEnd = subscription.cancel_at_period_end;
-        
-        // If cancel_at exists but cancel_at_period_end is false, treat as canceling
-        if (subscription.cancel_at && !subscription.cancel_at_period_end) {
-          subscriptionStatus = 'canceling';
-          cancelAtPeriodEnd = true;
-          console.log('✅ Detected cancellation via webhook');
-        }
+         if (subscription.status === 'active' && oldStatus !== 'active') {
+        emailService.sendSubscriptionEmails('subscription_purchased', user, {
+          planName: subscription.items?.data[0]?.price?.recurring?.interval === 'year' ? 'Pro Yearly' : 'Pro Monthly',
+          name: subscription.items?.data[0]?.price?.recurring?.interval === 'year' ? 'Pro Yearly' : 'Pro Monthly',
+          amount: `$${(subscription.items?.data[0]?.price?.unit_amount / 100).toFixed(2)}/${subscription.items?.data[0]?.price?.recurring?.interval}`,
+          currentPeriodEnd: subscription.current_period_end 
+            ? new Date(subscription.current_period_end * 1000)
+            : null,
+          period: subscription.items?.data[0]?.price?.recurring?.interval
+        });
+      }
+          if (subscription.cancel_at_period_end && !oldCancelAtPeriodEnd) {
+        emailService.sendSubscriptionEmails('subscription_canceled', user, {
+          planName: subscription.items?.data[0]?.price?.recurring?.interval === 'year' ? 'Pro Yearly' : 'Pro Monthly',
+          name: subscription.items?.data[0]?.price?.recurring?.interval === 'year' ? 'Pro Yearly' : 'Pro Monthly',
+          amount: `$${(subscription.items?.data[0]?.price?.unit_amount / 100).toFixed(2)}/${subscription.items?.data[0]?.price?.recurring?.interval}`,
+          cancelAtPeriodEnd: true,
+          cancelAt: subscription.cancel_at ? new Date(subscription.cancel_at * 1000) : null
+        });
+      }
+    
         
         // Update user
         const updates = {
@@ -88,8 +103,15 @@ router.post('/stripe-webhook', express.raw({type: 'application/json'}), async (r
           cancel_at_period_end: false,
           cancel_at: null
         });
+         emailService.sendSubscriptionEmails('subscription_canceled', deletedUser, {
+        planName: 'Previous Plan',
+        name: 'Previous Plan',
+        amount: 'N/A',
+        cancelAtPeriodEnd: false
+      });
         console.log('✅ User downgraded after subscription deletion');
       }
+      
       break;
   }
 
