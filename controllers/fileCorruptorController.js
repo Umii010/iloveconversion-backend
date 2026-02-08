@@ -3,9 +3,19 @@ const path = require('path');
 const crypto = require('crypto');
 const Logger = require('../services/logger');
 const archiver = require('archiver');
+const User = require('../models/User');
+
+// Helper function for formatting bytes
+function formatBytes(bytes) {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
 
 class FileCorruptorController {
-  // New method for handling multiple files
+  // New method for handling multiple files - UPDATED VERSION
   handleCorruptFiles = async (req, res) => {
     const startTime = Date.now();
     const tempFiles = [];
@@ -19,10 +29,81 @@ class FileCorruptorController {
         });
       }
 
-      // Validate file count
-      const MAX_FILES = 10;
-      if (req.files.length > MAX_FILES) {
+      // ✅ ADDED: Check user subscription status for dynamic limits
+      let userMaxFiles = 10; // Default for free users
+      let userMaxFileSize = 100 * 1024 * 1024; // 100MB for free users
+      let isProUser = false;
+      
+      if (req.session && req.session.userId) {
+        try {
+          const user = await User.getById(req.session.userId);
+          if (user && user.is_pro === 1) {
+            isProUser = true;
+            userMaxFiles = 999; // Unlimited for Pro users
+            userMaxFileSize = 500 * 1024 * 1024; // 500MB for Pro users
+          }
+          
+          console.log('User subscription check:', {
+            userId: req.session.userId,
+            isPro: user?.is_pro,
+            isProUser: isProUser,
+            maxFiles: userMaxFiles
+          });
+        } catch (userError) {
+          console.warn('User lookup error:', userError.message);
+          // Continue with free limits on error
+        }
+      }
+
+      // ✅ UPDATED: Validate file count based on subscription
+      if (req.files.length > userMaxFiles) {
         // Cleanup uploaded files
+        req.files.forEach(file => {
+          try {
+            if (fs.existsSync(file.path)) {
+              fs.unlinkSync(file.path);
+            }
+          } catch (err) {
+            console.warn(`Cleanup error:`, err.message);
+          }
+        });
+        
+        const errorMessage = isProUser
+          ? `Maximum batch size is ${userMaxFiles} files. You uploaded ${req.files.length} files.`
+          : `Maximum ${userMaxFiles} files allowed. You uploaded ${req.files.length} files.`;
+        
+        return res.status(400).json({
+          success: false,
+          error: errorMessage,
+          isProUser: isProUser,
+          maxFiles: userMaxFiles
+        });
+      }
+
+      // ✅ ADDED: Check individual file size limits based on subscription
+      const invalidFiles = [];
+      for (const file of req.files) {
+        if (file.size > userMaxFileSize) {
+          invalidFiles.push({
+            name: file.originalname,
+            reason: `File size exceeds ${formatBytes(userMaxFileSize)} limit (${formatBytes(file.size)})`,
+            size: file.size,
+            maxAllowed: userMaxFileSize
+          });
+          
+          // Cleanup this file
+          try {
+            if (fs.existsSync(file.path)) {
+              await fs.unlink(file.path);
+            }
+          } catch (err) {
+            console.warn(`Cleanup error:`, err.message);
+          }
+        }
+      }
+
+      if (invalidFiles.length > 0) {
+        // Cleanup any remaining valid files
         req.files.forEach(file => {
           try {
             if (fs.existsSync(file.path)) {
@@ -35,7 +116,10 @@ class FileCorruptorController {
         
         return res.status(400).json({
           success: false,
-          error: `Maximum ${MAX_FILES} files allowed. You uploaded ${req.files.length} files.`
+          error: 'Some files exceed size limits',
+          invalidFiles: invalidFiles,
+          maxFileSize: userMaxFileSize,
+          isProUser: isProUser
         });
       }
 
@@ -121,6 +205,12 @@ class FileCorruptorController {
 
       Logger.logUsage(req, 'file_corruptor', successful.length > 0).catch(() => {});
       
+      // ✅ ADDED: Add subscription info to response headers
+      res.setHeader('X-User-Status', isProUser ? 'pro' : 'free');
+      res.setHeader('X-Max-Files', userMaxFiles.toString());
+      res.setHeader('X-Max-File-Size', userMaxFileSize.toString());
+      res.setHeader('X-Is-Pro-User', isProUser.toString());
+      
       // If only one file, send it directly
       if (successful.length === 1) {
         const result = successful[0];
@@ -170,12 +260,49 @@ class FileCorruptorController {
     }
   }
 
-  // Original single file method for backward compatibility
+  // Original single file method for backward compatibility - UPDATED
   handleCorruptFile = async (req, res) => {
     try {
       if (!req.file) {
         Logger.logUsage(req, 'file_corruptor', false).catch(() => {});
         return res.status(400).json({ error: 'No file provided' });
+      }
+
+      // ✅ ADDED: Check user subscription
+      let isProUser = false;
+      let userMaxFileSize = 100 * 1024 * 1024;
+      
+      if (req.session && req.session.userId) {
+        try {
+          const user = await User.getById(req.session.userId);
+          if (user && user.is_pro === 1) {
+            isProUser = true;
+            userMaxFileSize = 500 * 1024 * 1024;
+          }
+        } catch (userError) {
+          console.warn('User lookup error:', userError.message);
+        }
+      }
+
+      // ✅ ADDED: Check file size based on subscription
+      if (req.file.size > userMaxFileSize) {
+        try {
+          if (fs.existsSync(req.file.path)) {
+            await fs.unlink(req.file.path);
+          }
+        } catch (err) {
+          console.warn(`Cleanup error:`, err.message);
+        }
+        
+        const errorMessage = isProUser
+          ? `File size exceeds ${formatBytes(userMaxFileSize)} limit for Pro users.`
+          : `File size exceeds ${formatBytes(userMaxFileSize)} limit for free users.`;
+        
+        return res.status(400).json({ 
+          error: errorMessage,
+          isProUser: isProUser,
+          maxFileSize: userMaxFileSize
+        });
       }
 
       const { method = 'extreme', intensity = 100 } = req.body;
@@ -218,6 +345,8 @@ class FileCorruptorController {
       res.setHeader('X-Corruption-Intensity', intensityValue);
       res.setHeader('X-Original-Size', originalBuffer.length);
       res.setHeader('X-Corrupted-Size', corruptedBuffer.length);
+      res.setHeader('X-User-Status', isProUser ? 'pro' : 'free');
+      res.setHeader('X-Is-Pro-User', isProUser.toString());
       res.setHeader('X-Warning', 'FILE IS COMPLETELY UNUSABLE - DO NOT ATTEMPT TO OPEN');
       
       Logger.logUsage(req, 'file_corruptor', true).catch(() => {});
@@ -235,7 +364,7 @@ class FileCorruptorController {
     }
   }
 
-  // Create ZIP from corrupted files
+  // Create ZIP from corrupted files - UPDATED with subscription info
   createCorruptedZip = async (results, method, intensity, res, tempFiles) => {
     return new Promise((resolve, reject) => {
       const archive = archiver('zip', {
@@ -243,6 +372,11 @@ class FileCorruptorController {
       });
       
       const zipFileName = `corrupted_files_${Date.now()}.zip`;
+      
+      // ✅ ADDED: Get user status from headers
+      const isProUser = res.getHeader('X-Is-Pro-User') === 'true';
+      const userMaxFiles = res.getHeader('X-Max-Files') || '10';
+      const userMaxFileSize = res.getHeader('X-Max-File-Size') || (100 * 1024 * 1024).toString();
       
       // Set response headers for ZIP download
       res.set({
@@ -254,6 +388,9 @@ class FileCorruptorController {
         'X-Successful-Count': results.filter(r => r.success).length.toString(),
         'X-Failed-Count': results.filter(r => !r.success).length.toString(),
         'X-Total-Files': results.length.toString(),
+        'X-User-Status': isProUser ? 'pro' : 'free',
+        'X-Max-Files': userMaxFiles,
+        'X-Max-File-Size': userMaxFileSize,
         'X-Warning': 'FILES ARE COMPLETELY UNUSABLE - DO NOT ATTEMPT TO OPEN'
       });
       
@@ -281,17 +418,23 @@ class FileCorruptorController {
         return;
       }
       
-      // Add a summary file
+      // ✅ UPDATED: Add subscription info to summary
       const summary = {
         corruptionMethod: method,
         intensity: intensity,
+        userStatus: isProUser ? 'pro' : 'free',
+        maxFilesAllowed: parseInt(userMaxFiles),
+        maxFileSizeAllowed: parseInt(userMaxFileSize),
+        maxFileSizeReadable: formatBytes(parseInt(userMaxFileSize)),
         totalFiles: results.length,
         successful: successfulResults.length,
         failed: results.filter(r => !r.success).length,
         files: successfulResults.map(r => ({
           originalName: r.fileName,
           originalSize: r.originalSize,
+          originalSizeReadable: formatBytes(r.originalSize),
           corruptedSize: r.corruptedSize,
+          corruptedSizeReadable: formatBytes(r.corruptedSize),
           reduction: ((1 - r.corruptedSize / r.originalSize) * 100).toFixed(2) + '%'
         })),
         timestamp: new Date().toISOString(),

@@ -28,7 +28,7 @@ const FileCorruptorController = require('../controllers/fileCorruptorController'
 const minifyController = require('../controllers/minifyController');
 const videoDownloaderController = require('../controllers/videoDownloaderController');
 const screenshotController = require('../controllers/screenshotController');
-// const colorExtractorController = require('../controllers/colorExtractorController');
+const checkSubscription = require('../middleware/subscriptionCheck');
 
 
 const { 
@@ -147,16 +147,125 @@ router.delete('/users/:id', UserController.deleteUser);
 
 
 //Routes
-router.post('/compress-pdf', upload.array('pdf', 15), compresspdfController.compressPdf);
-router.post('/merge-pdf', upload.array('files', 20), mergePdfController.mergePdfs);
+router.post('/compress-pdf', checkSubscription, (req, res, next) => {
+  // Adjust multer limits based on subscription
+  const maxFiles = req.isProUser ? 999 : 15;
+  
+  upload.array('pdf', maxFiles)(req, res, (err) => {
+    if (err) {
+      return res.status(400).json({
+        success: false,
+        message: err.message,
+        errorCode: 'UPLOAD_ERROR'
+      });
+    }
+    next();
+  });
+}, compresspdfController.compressPdf);
+router.post('/merge-pdf', checkSubscription, (req, res, next) => {
+  // Adjust multer limits based on subscription
+  const maxFiles = req.isProUser ? 999 : 7;
+  const maxSize = req.isProUser ? 500 * 1024 * 1024 : 100 * 1024 * 1024; // 500MB for Pro, 100MB for free
+  
+  upload.array('files', maxFiles)(req, res, (err) => {
+    if (err) {
+      return res.status(400).json({
+        success: false,
+        message: err.message,
+        errorCode: 'UPLOAD_ERROR'
+      });
+    }
+    next();
+  });
+}, mergePdfController.mergePdfs);
 router.post('/pdf-to-word', upload.single('file'), pdfToWordController.pdfToWord);
 
 router.post('/word-to-pdf', upload.single('file'), wordToPdfController.wordToPdf);
 router.post('/pdf-to-png', upload.single('file'), pdfToPngController.pdfToPng);
-router.post('/image-to-pdf',upload.array('images', 20),imageToPdfController.imageToPdf);
+router.post('/image-to-pdf', 
+  checkSubscription,
+  (req, res, next) => {
+    // Use dynamic limits from middleware
+    const maxFiles = req.maxFiles || 7;
+    const maxFileSize = req.maxFileSize || (100 * 1024 * 1024);
+    
+    console.log('Setting multer limits:', { maxFiles, maxFileSize });
+    
+    // Create multer instance with dynamic limits
+    const dynamicUpload = upload.array('images', maxFiles);
+    
+    dynamicUpload(req, res, (err) => {
+      if (err) {
+        console.error('Multer error:', err.message);
+        return res.status(400).json({
+          success: false,
+          message: err.message,
+          errorCode: 'UPLOAD_ERROR'
+        });
+      }
+      next();
+    });
+  },
+  imageToPdfController.imageToPdf
+);
 router.post('/ppt-to-pdf',upload.single('file'),pptToPdfController.pptToPdf);
 router.post( '/rotate-pdf',upload.array('files', 10),rotatePdfController.rotatePdf);
-router.post('/corrupt-files', upload.array('files', 10), FileCorruptorController.handleCorruptFiles);
+router.post('/corrupt-files', checkSubscription, (req, res, next) => {
+  // Set limits based on subscription
+  const maxFiles = req.isProUser ? 999 : 10;
+  const maxFileSize = req.isProUser ? 500 * 1024 * 1024 : 100 * 1024 * 1024;
+  
+  // Configure multer with dynamic limits
+  const dynamicUpload = multer({
+    storage: multer.diskStorage({
+      destination: (req, file, cb) => {
+        const uploadDir = path.join(__dirname, '../uploads');
+        if (!fs.existsSync(uploadDir)) {
+          fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        cb(null, uploadDir);
+      },
+      filename: (req, file, cb) => {
+        const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(7)}${path.extname(file.originalname)}`;
+        cb(null, uniqueName);
+      }
+    }),
+    limits: {
+      fileSize: maxFileSize,
+      files: maxFiles
+    },
+    fileFilter: (req, file, cb) => {
+      // Accept all files for corruption
+      cb(null, true);
+    }
+  });
+  
+  dynamicUpload.array('files', maxFiles)(req, res, (err) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({
+          success: false,
+          error: `File too large. Maximum size: ${formatBytes(maxFileSize)}`,
+          maxFileSize: maxFileSize,
+          isProUser: req.isProUser
+        });
+      }
+      if (err.code === 'LIMIT_FILE_COUNT') {
+        return res.status(400).json({
+          success: false,
+          error: `Too many files. Maximum: ${maxFiles}`,
+          maxFiles: maxFiles,
+          isProUser: req.isProUser
+        });
+      }
+      return res.status(400).json({
+        success: false,
+        error: err.message
+      });
+    }
+    next();
+  });
+}, FileCorruptorController.handleCorruptFiles);
 router.post('/unlock-pdf', upload.array('files', 10),unlockPdfController.unlockPdf);
 router.post('/pdf-to-excel',upload.single('file'),pdfToExcelController.pdfToExcel);
 router.post('/html-to-pdf', htmlToPdfController.htmlToPdf);

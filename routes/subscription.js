@@ -40,17 +40,18 @@ router.get('/subscription', async (req, res) => {
       current_period_end: user.current_period_end
     });
 
-    // If user has Stripe subscription, get latest info but DON'T overwrite plan type
+    // If user has Stripe subscription, get latest info
     if (user.stripe_customer_id && user.subscription_id) {
       try {
-        const subscription = await stripe.subscriptions.retrieve(user.subscription_id, {
-          expand: ['latest_invoice']
-        });
+        // IMPORTANT: Don't expand 'latest_invoice' as it might not contain period info
+        const subscription = await stripe.subscriptions.retrieve(user.subscription_id);
         
         console.log('✅ Stripe subscription details:', {
           status: subscription.status,
           cancel_at_period_end: subscription.cancel_at_period_end,
-          current_period_end: subscription.current_period_end
+          current_period_end: subscription.current_period_end,
+          current_period_start: subscription.current_period_start,
+          cancel_at: subscription.cancel_at
         });
 
         // Determine subscription status
@@ -63,10 +64,21 @@ router.get('/subscription', async (req, res) => {
           cancelAtPeriodEnd = true;
         }
 
-        // Calculate dates
-        let currentPeriodEnd = user.current_period_end; // Keep existing if not in Stripe
+        // Calculate dates - FIX HERE: Handle undefined values properly
+        let currentPeriodEnd = user.current_period_end; // Default to database value
+        
+        // Check if Stripe returns current_period_end (it should be in seconds)
         if (subscription.current_period_end) {
+          console.log('📅 Stripe current_period_end exists:', subscription.current_period_end);
           currentPeriodEnd = new Date(subscription.current_period_end * 1000);
+        } else if (user.current_period_end) {
+          // Use database value if Stripe doesn't have it
+          console.log('⚠️ Using database current_period_end');
+          currentPeriodEnd = user.current_period_end;
+        } else {
+          // Calculate fallback expiry if neither exists
+          console.log('⚠️ Calculating fallback expiry');
+          currentPeriodEnd = calculateFallbackExpiry(subscriptionData.plan);
         }
         
         let cancelAt = user.cancel_at; // Keep existing
@@ -74,7 +86,7 @@ router.get('/subscription', async (req, res) => {
           cancelAt = new Date(subscription.cancel_at * 1000);
         }
 
-        // **CRITICAL: Use database plan, NOT Stripe plan**
+        // Use database plan
         const dbPlan = user.subscription_plan || 'monthly';
         
         subscriptionData = {
@@ -83,7 +95,6 @@ router.get('/subscription', async (req, res) => {
           currentPeriodEnd: currentPeriodEnd,
           cancelAtPeriodEnd: cancelAtPeriodEnd,
           cancelAt: cancelAt,
-          // Keep amount/period based on DATABASE plan
           amount: dbPlan === 'monthly' ? '$19.99' : 
                   dbPlan === 'yearly' ? '$199.99' : '$0',
           period: dbPlan === 'yearly' ? 'year' : 'month'
@@ -91,12 +102,14 @@ router.get('/subscription', async (req, res) => {
 
         console.log('📊 Updated subscriptionData:', {
           status: subscriptionData.status,
-          plan: subscriptionData.plan, // Should be from database
+          plan: subscriptionData.plan,
           cancelAtPeriodEnd: subscriptionData.cancelAtPeriodEnd,
-          currentPeriodEnd: subscriptionData.currentPeriodEnd
+          currentPeriodEnd: subscriptionData.currentPeriodEnd,
+          currentPeriodEndType: typeof subscriptionData.currentPeriodEnd,
+          currentPeriodEndValue: subscriptionData.currentPeriodEnd
         });
 
-        // Update database with status and dates, but NOT plan
+        // Update database with status and dates
         const dbUpdates = {
           subscription_status: subscriptionStatus,
           cancel_at_period_end: cancelAtPeriodEnd,
@@ -112,9 +125,9 @@ router.get('/subscription', async (req, res) => {
           dbUpdates.is_pro = 1;
         }
 
-        console.log('💾 Database updates (preserving plan):', dbUpdates);
+        console.log('💾 Database updates:', dbUpdates);
         
-        // Only update if we have actual changes (excluding plan)
+        // Update database
         await User.update(user.id, dbUpdates);
 
       } catch (stripeError) {
@@ -123,12 +136,33 @@ router.get('/subscription', async (req, res) => {
       }
     }
 
-    console.log('📤 Final subscriptionData:', subscriptionData);
-
-    res.json({
-      success: true,
-      ...subscriptionData
+    console.log('📤 Final subscriptionData:', {
+      isPro: subscriptionData.isPro,
+      plan: subscriptionData.plan,
+      status: subscriptionData.status,
+      currentPeriodEnd: subscriptionData.currentPeriodEnd,
+      currentPeriodEndDate: subscriptionData.currentPeriodEnd ? subscriptionData.currentPeriodEnd.toISOString() : 'null',
+      cancelAtPeriodEnd: subscriptionData.cancelAtPeriodEnd
     });
+
+    // Ensure we always return a valid date or null
+    const responseData = {
+      success: true,
+      isPro: subscriptionData.isPro,
+      plan: subscriptionData.plan,
+      status: subscriptionData.status,
+      currentPeriodEnd: subscriptionData.currentPeriodEnd ? subscriptionData.currentPeriodEnd.toISOString() : null,
+      cancelAtPeriodEnd: subscriptionData.cancelAtPeriodEnd,
+      cancelAt: subscriptionData.cancelAt ? subscriptionData.cancelAt.toISOString() : null,
+      subscriptionId: subscriptionData.subscriptionId,
+      customerId: subscriptionData.customerId,
+      amount: subscriptionData.amount,
+      period: subscriptionData.period
+    };
+
+    console.log('📦 Sending response:', responseData);
+    
+    res.json(responseData);
 
   } catch (error) {
     console.error('❌ Get subscription error:', error);
@@ -136,6 +170,19 @@ router.get('/subscription', async (req, res) => {
   }
 });
 
+// Add this helper function
+function calculateFallbackExpiry(plan) {
+  const expiry = new Date();
+  if (plan === 'yearly') {
+    expiry.setFullYear(expiry.getFullYear() + 1);
+  } else if (plan === 'monthly') {
+    expiry.setMonth(expiry.getMonth() + 1);
+  } else {
+    // Free plan - no expiry
+    return null;
+  }
+  return expiry;
+}
 // Create Stripe Customer Portal session
 router.post('/create-portal-session', async (req, res) => {
   try {

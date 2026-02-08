@@ -1,36 +1,26 @@
 const express = require('express');
 const router = express.Router();
 const {
-  upload,
+  dynamicUpload,
   validateConversionRequest,
-  validateProRequest,
+  dynamicRateLimit,
   convertHeicFiles,
   getConversionStatus,
   healthCheck,
-  freeRateLimit,
-  proRateLimit
+  getUserLimits
 } = require('../controllers/heicConverterController');
 
 // Health check
 router.get('/health', healthCheck);
 
-// Free tier conversion
+// Get current user's limits based on subscription
+router.get('/limits', getUserLimits);
+
+// Main conversion endpoint (handles both free and pro users dynamically)
 router.post(
   '/convert',
-  freeRateLimit,
-  upload.array('files', 10), // Max 10 files for free
-  validateConversionRequest,
-  convertHeicFiles
-);
-
-// Pro tier conversion
-router.post(
-  '/convert/pro',
-  validateProRequest,
-  proRateLimit,
-  (req, res, next) => {
-    req.upload.array('files', 100)(req, res, next); // Max 100 files for pro
-  },
+  dynamicRateLimit,
+  (req, res, next) => dynamicUpload(req, res, next),
   validateConversionRequest,
   convertHeicFiles
 );
@@ -39,15 +29,15 @@ router.post(
 router.get('/status/:conversionId', getConversionStatus);
 
 // Get subscription info
-router.get('/limits', (req, res) => {
+router.get('/subscription-info', (req, res) => {
   res.json({
     success: true,
     data: {
       free: {
-        maxFiles: 10,
+        maxFiles: 7,
         maxFileSize: '50MB',
         dailyConversions: 50,
-        features: ['Basic conversion', '10 files max', 'Standard quality']
+        features: ['Basic conversion', '7 files max', 'Standard quality']
       },
       pro: {
         maxFiles: 100,
@@ -60,12 +50,7 @@ router.get('/limits', (req, res) => {
           'Batch ZIP',
           'API access',
           'No watermarks'
-        ],
-        pricing: {
-          monthly: '$9.99',
-          yearly: '$99.99',
-          lifetime: '$299.99'
-        }
+        ]
       }
     }
   });
