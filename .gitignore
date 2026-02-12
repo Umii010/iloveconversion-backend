@@ -12,7 +12,7 @@ yarn-error.log*
 .env
 .env.local
 .env.*.local
-
+.env-example
 # Build output
 dist/
 build/

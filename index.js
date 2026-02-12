@@ -22,10 +22,12 @@ dotenv.config();
 const app = express();
 
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://192.168.18.101:5173', 'http://192.168.0.171:5173','http://192.168.18.62:5173'],
+  origin: ['http://localhost:5173', 'http://192.168.18.101:5173', 'http://192.168.0.171:5173','http://192.168.18.62:5173','http://192.168.18.62:3000'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With','Cache-Control',   
+    'Pragma',           
+    'Accept'  ],
    exposedHeaders: ['set-cookie']
 }));
 
@@ -122,6 +124,7 @@ app.listen(PORT, HOST, () => {
   console.log(`📡 Accessible at:`);
   console.log(`   Local:    http://localhost:${PORT}`);
   console.log(`   Network:  http://192.168.18.101:${PORT}`);
+  console.log(`   Network:  http://192.168.18.62:${PORT}`);
   console.log(`   All IPs:  http://0.0.0.0:${PORT}`);
   console.log(`\n📚 Test endpoints:`);
   console.log(`   GET  http://localhost:${PORT}/`);

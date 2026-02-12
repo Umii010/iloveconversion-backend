@@ -38,7 +38,6 @@ const {
 } = require('../middleware/validation');
 
 
-
 const requireAuth = (req, res, next) => {
   if (!req.session.userId) {
     return res.status(401).json({
@@ -162,13 +161,37 @@ router.post('/compress-pdf', checkSubscription, (req, res, next) => {
     next();
   });
 }, compresspdfController.compressPdf);
+
 router.post('/merge-pdf', checkSubscription, (req, res, next) => {
-  // Adjust multer limits based on subscription
   const maxFiles = req.isProUser ? 999 : 7;
-  const maxSize = req.isProUser ? 500 * 1024 * 1024 : 100 * 1024 * 1024; // 500MB for Pro, 100MB for free
+  const maxSize = req.isProUser ? 500 * 1024 * 1024 : 5 * 1024 * 1024; 
+  const dynamicUpload = upload.array('files', maxFiles);
   
-  upload.array('files', maxFiles)(req, res, (err) => {
+  dynamicUpload(req, res, (err) => {
     if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({
+          success: false,
+          message: `File size exceeds ${formatBytes(maxSize)} limit`,
+          errorCode: 'FILE_TOO_LARGE',
+          maxSize: maxSize
+        });
+      }
+      if (err.code === 'LIMIT_FILE_COUNT') {
+        return res.status(400).json({
+          success: false,
+          message: `Maximum ${maxFiles} files allowed`,
+          errorCode: 'MAX_FILES_EXCEEDED',
+          maxFiles: maxFiles
+        });
+      }
+      if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid file field name. Use "files" as field name.',
+          errorCode: 'INVALID_FIELD_NAME'
+        });
+      }
       return res.status(400).json({
         success: false,
         message: err.message,
@@ -178,6 +201,90 @@ router.post('/merge-pdf', checkSubscription, (req, res, next) => {
     next();
   });
 }, mergePdfController.mergePdfs);
+
+
+router.get('/download/:token', (req, res) => {
+  // Handle preflight (OPTIONS) requests
+  if (req.method === 'OPTIONS') {
+    res.set({
+      'Access-Control-Allow-Origin': req.headers.origin || 'http://192.168.18.62:5173',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, Cache-Control, Pragma, Accept',
+      'Access-Control-Allow-Credentials': 'true',
+      'Access-Control-Max-Age': '86400'
+    });
+    return res.sendStatus(200);
+  }
+
+  // Handle actual GET requests
+  return mergePdfController.downloadViaQR(req, res);
+});
+
+router.get('/qr-status/:token', mergePdfController.checkQRStatus);
+router.post(
+  '/send-to-email', 
+  checkSubscription,
+  mergePdfController.sendToEmail
+);
+
+router.get(
+  '/preview/:token',
+  checkSubscription, // This sets req.isProUser based on session
+  (req, res, next) => {
+    console.log('Preview access - User authenticated:', !!req.session.userId);
+    console.log('Is Pro User:', req.isProUser);
+    
+    // Check if user is authenticated
+    if (!req.session.userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Please login to use preview feature',
+        errorCode: 'LOGIN_REQUIRED'
+      });
+    }
+    
+    // Check if user is Pro
+    if (!req.isProUser) {
+      return res.status(403).json({
+        success: false,
+        message: 'Preview feature requires a Pro subscription',
+        errorCode: 'PRO_FEATURE_REQUIRED'
+      });
+    }
+    
+    next();
+  },
+  mergePdfController.generatePreview
+);
+
+
+router.post(
+  '/process-pdf/:token',
+  checkSubscription,
+  (req, res, next) => {
+    console.log('Process PDF - Is Pro User:', req.isProUser);
+    
+    if (!req.session.userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Please login to edit PDF',
+        errorCode: 'LOGIN_REQUIRED'
+      });
+    }
+    
+    if (!req.isProUser) {
+      return res.status(403).json({
+        success: false,
+        message: 'PDF editing requires a Pro subscription',
+        errorCode: 'PRO_FEATURE_REQUIRED'
+      });
+    }
+    
+    next();
+  },
+  mergePdfController.processPDF
+);
+
 router.post('/pdf-to-word', upload.single('file'), pdfToWordController.pdfToWord);
 
 router.post('/word-to-pdf', upload.single('file'), wordToPdfController.wordToPdf);
