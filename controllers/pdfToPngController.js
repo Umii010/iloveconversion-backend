@@ -4,7 +4,8 @@ const fs = require('fs');
 const { exec } = require('child_process');
 const util = require('util');
 const archiver = require('archiver');
-const Logger = require('../services/logger'); 
+const Logger = require('../services/logger');
+const { checkSingleFileLimit } = require('../config/limits');
 
 const execPromise = util.promisify(exec);
 
@@ -15,11 +16,9 @@ exports.pdfToPng = async (req, res) => {
   try {
     if (!req.file) {
       Logger.logUsage(req, 'pdf_to_png', false).catch(() => {});
-      return res.status(400).json({
-        success: false,
-        message: 'No PDF uploaded'
-      });
+      return res.status(400).json({ success: false, message: 'No PDF uploaded' });
     }
+    if (checkSingleFileLimit(req, res)) return;
 
     inputPath = req.file.path;
     const originalName = path.parse(req.file.originalname).name;

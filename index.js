@@ -2,7 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan'); 
 const cookieParser = require('cookie-parser');
-const userTracker = require('./middleware/userTracker');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const barcodeRoutes = require('./routes/barcodeRoutes');
 const encoderRoutes = require('./routes/encoderRoutes');
 const heicConverterRoutes = require('./routes/heicConverter');
@@ -19,10 +20,61 @@ const subscriptionRoutes = require('./routes/subscription');
 
 dotenv.config();
 
+// Handle unhandled promise rejections - prevent server crash
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+// Handle uncaught exceptions - log and exit gracefully
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err.message);
+  console.error(err.stack);
+  process.exit(1);
+});
+
+// Shared store for compress PDF download tokens (same process). Merge PDF uses qrService.
+if (typeof global !== 'undefined' && !global.downloadTokens) {
+  global.downloadTokens = new Map();
+}
+
 const app = express();
 
+// Security: Helmet - set secure HTTP headers
+app.use(helmet({
+  contentSecurityPolicy: false, // Disable CSP to avoid breaking external scripts/ads
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: { policy: 'cross-origin' }
+}));
+
+// Rate limiting - prevent abuse and DDoS
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: process.env.NODE_ENV === 'production' ? 200 : 1000, // requests per window
+  message: { success: false, error: 'Too many requests, please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+app.use(limiter);
+
+// Stricter rate limit for auth endpoints (applied in routes via separate limiter if needed)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20, // 20 login/register attempts per 15 min
+  message: { success: false, error: 'Too many attempts. Please try again later.' }
+});
+
+const corsOrigins = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(',').map(s => s.trim()).filter(Boolean)
+  : [
+      'http://localhost:5173',
+      'http://localhost:3000',
+      'http://127.0.0.1:5173',
+      'http://127.0.0.1:3000',
+      ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : [])
+    ];
+
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://192.168.18.101:5173', 'http://192.168.0.171:5173','http://192.168.18.62:5173','http://192.168.18.62:3000'],
+  origin: corsOrigins.length ? corsOrigins : true,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With','Cache-Control',   
@@ -36,18 +88,26 @@ app.use(cookieParser());
 
 app.use(sessionMiddleware);
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(
   session({
     secret: process.env.SESSION_SECRET || 'supersecret',
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: false } 
+    cookie: {
+    secure: process.env.NODE_ENV === 'production' && process.env.FRONTEND_URL?.startsWith('https'),
+    sameSite: process.env.NODE_ENV === 'production' ? 'lax' : 'lax'
+  } 
   })
 );
 
 app.use(morgan(':date[clf] ":method :url" :status :response-time ms'));
+
+// Apply stricter rate limit to auth routes
+app.use('/api/register', authLimiter);
+app.use('/api/login', authLimiter);
+app.use('/api/forgot-password', authLimiter);
 
 // Test database connection
 testConnection();
@@ -87,6 +147,8 @@ const codeDiffRoutes = require('./routes/codeDiffRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
 const designRoutes = require('./routes/designRoutes');
 const colorRoutes = require('./routes/colorRoutes');
+const notFoundHandler = require('./middleware/notFound');
+const { errorHandler } = require('./middleware/errorHandler');
 
 app.use('/api', userRoutes);
 app.use('/api/developer', developerRoutes);
@@ -106,15 +168,11 @@ app.use('/api', subscriptionRoutes);
 
 
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error('Server error:', err.stack);
-  res.status(500).json({
-    success: false,
-    error: 'Internal server error',
-    message: process.env.NODE_ENV === 'development' ? err.message : undefined
-  });
-});
+// 404 - Must be after all valid routes
+app.use(notFoundHandler);
+
+// Centralized error handling - catches all errors from routes
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 3000;
 const HOST = '0.0.0.0'; // Listen on all network interfaces

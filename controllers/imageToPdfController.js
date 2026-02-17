@@ -34,51 +34,38 @@ exports.imageToPdf = async (req, res) => {
       });
     }
     
-    // Get limits from middleware (added by checkSubscription middleware)
-    const isProUser = req.isProUser || false;
-    const maxFiles = req.maxFiles || 7;
-    const maxFileSize = req.maxFileSize || (100 * 1024 * 1024); // 100MB default
-    
-    console.log('📊 Image to PDF processing with limits:', {
-      isProUser,
-      maxFiles,
-      maxFileSize: formatBytes(maxFileSize),
-      uploadedFiles: req.files.length,
-      userId: req.session?.userId || 'guest'
-    });
+    const { getBatchLimits } = require('../config/limits');
+    const isProUser = !!req.isProUser;
+    const { maxFiles, maxTotalSize } = getBatchLimits(isProUser);
+    const maxFileSize = maxTotalSize;
 
-    // Check file count against user's limit
     if (req.files.length > maxFiles) {
       Logger.logUsage(req, 'image_to_pdf', false).catch(() => {});
       return res.status(400).json({
         success: false,
-        message: isProUser 
-          ? `Maximum ${maxFiles} images allowed per batch. Please split your files into smaller batches.`
-          : `Free users can process only ${maxFiles} images at once. Upgrade to Pro for unlimited processing.`,
+        message: isProUser
+          ? `Maximum ${maxFiles} images per batch. You uploaded ${req.files.length}.`
+          : `Free users: max ${maxFiles} images at once. Upgrade to Pro for more.`,
         errorCode: 'MAX_FILES_EXCEEDED',
         maxAllowed: maxFiles,
         uploadedCount: req.files.length,
-        isProUser: isProUser
+        isProUser
       });
     }
 
     const totalImages = req.files.length;
-    const originalSizes = req.files.map(file => file.size);
-    const totalOriginalSize = originalSizes.reduce((sum, size) => sum + size, 0);
-    
-    // Check total size against user's limit
-    if (totalOriginalSize > (maxFileSize * maxFiles)) {
-      const totalSizeLimit = formatBytes(maxFileSize * maxFiles);
+    const totalOriginalSize = req.files.reduce((sum, f) => sum + f.size, 0);
+    if (totalOriginalSize > maxTotalSize) {
       Logger.logUsage(req, 'image_to_pdf', false).catch(() => {});
       return res.status(400).json({
         success: false,
-        message: isProUser 
-          ? `Total file size exceeds ${totalSizeLimit} limit. Please reduce file sizes.`
-          : `Total file size exceeds ${totalSizeLimit} limit. Upgrade to Pro for larger file support.`,
+        message: isProUser
+          ? `Total size exceeds ${(maxTotalSize / (1024 * 1024)) | 0}MB.`
+          : `Free users: total size must be ≤7MB. Your selection is ${(totalOriginalSize / (1024 * 1024)).toFixed(1)}MB. Upgrade to Pro for 20MB.`,
         errorCode: 'TOTAL_SIZE_EXCEEDED',
         totalSize: formatBytes(totalOriginalSize),
-        sizeLimit: totalSizeLimit,
-        isProUser: isProUser
+        sizeLimit: formatBytes(maxTotalSize),
+        isProUser
       });
     }
     

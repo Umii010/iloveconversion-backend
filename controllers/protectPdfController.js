@@ -3,17 +3,17 @@ const path = require('path');
 const os = require('os');
 const { exec } = require('child_process');
 const Logger = require('../services/logger');
+const { checkSingleFileLimit } = require('../config/limits');
 
-
-const QPDF_PATH = `"C:\\Program Files\\qpdf\\bin\\qpdf.exe"`; 
+const QPDF_PATH = `"C:\\Program Files\\qpdf\\bin\\qpdf.exe"`;
 
 exports.protectPdf = async (req, res) => {
   try {
     if (!req.file) {
-            Logger.logUsage(req, 'pdf_protect', false).catch(() => {});
-
+      Logger.logUsage(req, 'pdf_protect', false).catch(() => {});
       return res.status(400).json({ success: false, message: 'No PDF uploaded' });
     }
+    if (checkSingleFileLimit(req, res)) return;
 
     const pdfPath = req.file.path;
     const originalName = path.parse(req.file.originalname).name;

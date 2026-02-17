@@ -44,7 +44,8 @@ exports.mergePdfs = async (req, res) => {
     }
 
     // Use subscription-based limits from middleware
-    const maxFiles = req.isProUser ? 999 : 7;
+    const { getBatchLimits } = require('../config/limits');
+    const { maxFiles } = getBatchLimits(!!req.isProUser);
     if (filesArray.length > maxFiles) {
       Logger.logUsage(req, 'pdf_merge', false).catch(() => {});
       return res.status(400).json({
@@ -622,9 +623,27 @@ exports.sendToEmail = async (req, res) => {
       });
     }
 
-    // Get file data from QR service
-    const fileData = await qrService.getDownloadData(token);
-    
+    // Resolve file data: compress tokens in global.downloadTokens, merge tokens in qrService
+    let fileData = null;
+    const downloadTokens = typeof global !== 'undefined' ? global.downloadTokens : null;
+    const isCompressToken = token && String(token).startsWith('compress_');
+
+    if (isCompressToken && downloadTokens && downloadTokens.has(token)) {
+      const tokenData = downloadTokens.get(token);
+      if (tokenData && tokenData.expiry >= Date.now()) {
+        const displayName = fileName || (tokenData.results && tokenData.results.length === 1
+          ? `compressed_${tokenData.results[0].cleanedName || tokenData.results[0].fileName}`
+          : `compressed_files_${Date.now()}.zip`);
+        const displaySize = fileSize || (tokenData.results && tokenData.results.length === 1
+          ? tokenData.results[0].compressedSize
+          : (tokenData.results || []).reduce((sum, r) => sum + (r.compressedSize || 0), 0));
+        fileData = { buffer: Buffer.alloc(0), fileName: displayName, fileSize: displaySize, expiresAt: tokenData.expiry };
+        console.log('📧 Send-to-email: using compress token from global.downloadTokens');
+      }
+    }
+    if (!fileData) {
+      fileData = await qrService.getDownloadData(token);
+    }
     if (!fileData) {
       return res.status(404).json({
         success: false,
@@ -633,32 +652,48 @@ exports.sendToEmail = async (req, res) => {
       });
     }
 
-    // Initialize nodemailer
+    // Email config required
+    const mailUser = process.env.MAIL_USERNAME || process.env.SMTP_USER;
+    const mailPass = process.env.MAIL_PASSWORD || process.env.SMTP_PASSWORD;
+    if (!mailUser || !mailPass) {
+      console.error('❌ Email not configured: set MAIL_USERNAME and MAIL_PASSWORD (or SMTP_USER and SMTP_PASSWORD) in .env');
+      return res.status(503).json({
+        success: false,
+        message: 'Email is not configured on the server. Please contact support.',
+        errorCode: 'EMAIL_NOT_CONFIGURED'
+      });
+    }
+
     const nodemailer = require('nodemailer');
-    
-    const transporter = nodemailer.createTransporter?.() || nodemailer.createTransport({
+    const mailPort = parseInt(process.env.MAIL_PORT, 10) || 465;
+    const useSecure = process.env.MAIL_SECURE !== undefined ? process.env.MAIL_SECURE === 'true' : mailPort === 465;
+
+    const transporter = nodemailer.createTransport({
       host: process.env.MAIL_HOST || 'smtp.hostinger.com',
-      port: parseInt(process.env.MAIL_PORT) || 465,
-      secure: process.env.MAIL_SECURE === 'true',
+      port: mailPort,
+      secure: useSecure,
       auth: {
-        user: process.env.MAIL_USERNAME,
-        pass: process.env.MAIL_PASSWORD
+        user: mailUser,
+        pass: mailPass
       }
     });
 
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     const downloadUrl = `${baseUrl}/api/download/${token}`;
 
+    const emailFileName = fileData.fileName || fileName || 'merged.pdf';
+    const emailFileSize = fileData.fileSize ?? fileSize ?? (fileData.buffer && fileData.buffer.length) ?? 0;
+    const fromAddress = process.env.SMTP_FROM || process.env.MAIL_FROM || mailUser;
     const mailOptions = {
-      from: `"iLoveConversion" <${process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@devvault.io'}>`,
+      from: `"iLoveConversion" <${fromAddress}>`,
       to: email,
-      subject: '📄 Your Merged PDF is Ready - iLoveConversion',
-      html: generateEmailHTML(fileName || 'merged.pdf', fileSize || fileData.buffer.length, downloadUrl, fileData.expiresAt),
-      text: generateEmailText(fileName || 'merged.pdf', fileSize || fileData.buffer.length, downloadUrl, fileData.expiresAt)
+      subject: '📄 Your file is ready - iLoveConversion',
+      html: generateEmailHTML(emailFileName, emailFileSize, downloadUrl, fileData.expiresAt),
+      text: generateEmailText(emailFileName, emailFileSize, downloadUrl, fileData.expiresAt)
     };
 
     await transporter.sendMail(mailOptions);
-    console.log(`📧 Email sent successfully to ${email} for file: ${fileName}`);
+    console.log(`📧 Email sent successfully to ${email} for file: ${emailFileName}`);
 
     return res.json({
       success: true,
@@ -668,11 +703,17 @@ exports.sendToEmail = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Email sending failed:', error);
-    
+    console.error('❌ Email sending failed:', error.message);
+    if (error.code) console.error('   Code:', error.code);
+    if (error.response) console.error('   Response:', error.response);
+
+    let userMessage = 'Failed to send email. Please try again.';
+    if (error.code === 'EAUTH') userMessage = 'Email server login failed. Check MAIL_USERNAME and MAIL_PASSWORD in .env.';
+    else if (error.code === 'ECONNECTION' || error.code === 'ETIMEDOUT') userMessage = 'Could not connect to email server. Check MAIL_HOST and MAIL_PORT.';
+
     return res.status(500).json({
       success: false,
-      message: 'Failed to send email. Please try again.',
+      message: userMessage,
       errorCode: 'EMAIL_SEND_FAILED',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });

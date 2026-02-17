@@ -36,6 +36,25 @@ const loginValidation = [
     .notEmpty().withMessage('Password is required')
 ];
 
+const forgotPasswordValidation = [
+  body('email')
+    .trim()
+    .notEmpty().withMessage('Email is required')
+    .isEmail().withMessage('Please enter a valid email address')
+    .normalizeEmail()
+];
+
+const resetPasswordValidation = [
+  body('token')
+    .notEmpty().withMessage('Reset token is required')
+    .matches(/^[a-f0-9]{64}$/).withMessage('Invalid reset token format'),
+  body('password')
+    .notEmpty().withMessage('Password is required')
+    .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
+    .matches(/[A-Z]/).withMessage('Password must contain at least one uppercase letter')
+    .matches(/[0-9]/).withMessage('Password must contain at least one number')
+];
+
 const updateUserValidation = [
   body('name')
     .optional()
@@ -65,5 +84,7 @@ const updateUserValidation = [
 module.exports = {
   registerValidation,
   loginValidation,
+  forgotPasswordValidation,
+  resetPasswordValidation,
   updateUserValidation
 };

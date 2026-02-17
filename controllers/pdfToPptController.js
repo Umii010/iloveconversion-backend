@@ -3,21 +3,18 @@ const os = require('os');
 const fs = require('fs');
 const { exec } = require('child_process');
 const util = require('util');
-const Logger = require('../services/logger'); 
-
+const Logger = require('../services/logger');
+const { checkSingleFileLimit } = require('../config/limits');
 
 const execPromise = util.promisify(require('child_process').exec);
 
 exports.pdfToPpt = async (req, res) => {
   console.log('PDF to PPT conversion started');
-  
   if (!req.file) {
     Logger.logUsage(req, 'pdf_to_ppt', false).catch(() => {});
-    return res.status(400).json({
-      success: false,
-      message: 'No PDF uploaded'
-    });
+    return res.status(400).json({ success: false, message: 'No PDF uploaded' });
   }
+  if (checkSingleFileLimit(req, res)) return;
 
   const inputPath = req.file.path;
   const originalName = path.parse(req.file.originalname).name;

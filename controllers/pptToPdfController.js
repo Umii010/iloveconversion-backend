@@ -5,20 +5,16 @@ const { exec } = require('child_process');
 const util = require('util');
 const execPromise = util.promisify(exec);
 
-const Logger = require('../services/logger'); 
-
+const Logger = require('../services/logger');
+const { checkSingleFileLimit } = require('../config/limits');
 
 exports.pptToPdf = async (req, res) => {
   console.log('🚀 PPT to PDF conversion started');
-  
   if (!req.file) {
-        Logger.logUsage(req, 'ppt_to_pdf', false).catch(() => {});
-
-    return res.status(400).json({
-      success: false,
-      message: 'No PowerPoint file uploaded'
-    });
+    Logger.logUsage(req, 'ppt_to_pdf', false).catch(() => {});
+    return res.status(400).json({ success: false, message: 'No PowerPoint file uploaded' });
   }
+  if (checkSingleFileLimit(req, res)) return;
 
   const inputPath = req.file.path;
   const originalName = path.parse(req.file.originalname).name;

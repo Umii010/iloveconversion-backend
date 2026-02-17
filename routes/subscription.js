@@ -498,46 +498,58 @@ router.post('/reactivate-subscription', async (req, res) => {
 // Get payment history
 router.get('/payment-history', async (req, res) => {
   try {
-    console.log('📊 GET /api/payment-history called');
-    console.log('👤 User ID from session:', req.session.userId);
-    
     if (!req.session.userId) {
       return res.status(401).json({ success: false, error: 'Not authenticated' });
     }
 
     const user = await User.getById(req.session.userId);
     
-    console.log('👤 User from database (full):', user);
-    
     if (!user) {
-      console.log('❌ User not found');
-      return res.json({ success: true, payments: [] });
+      return res.json({ success: true, payments: [], stripe_customer_id: null, subscription_id: null, current_period_end: null, subscription_plan: null });
     }
 
     if (!user.stripe_customer_id) {
-      console.log('⚠️ No stripe_customer_id for user:', user.id);
-      return res.json({ success: true, payments: [] });
+      return res.json({ 
+        success: true, 
+        payments: [], 
+        stripe_customer_id: null, 
+        subscription_id: user.subscription_id || null, 
+        current_period_end: user.current_period_end || null, 
+        subscription_plan: user.subscription_plan || null,
+        created_at: user.created_at || null
+      });
     }
 
-    console.log('🔍 Fetching invoices for customer:', user.stripe_customer_id);
-    
     const invoices = await stripe.invoices.list({
       customer: user.stripe_customer_id,
-      limit: 10,
+      limit: 20,
+      status: 'paid'
     });
 
-    console.log('✅ Invoices found:', invoices.data.length);
-    
-    const payments = invoices.data.map(invoice => ({
-      id: invoice.id,
-      created: new Date(invoice.created * 1000),
-      amount: invoice.amount_paid,
-      status: invoice.status,
-      invoice_pdf: invoice.invoice_pdf,
-      receipt_url: invoice.hosted_invoice_url
-    }));
+    const payments = invoices.data.map(invoice => {
+      const lineItem = invoice.lines?.data?.[0];
+      const planFromLine = lineItem?.description || 
+        (lineItem?.plan?.interval ? `${(lineItem.plan.interval_count || 1)} ${lineItem.plan.interval}` : null);
+      const subId = typeof invoice.subscription === 'string' ? invoice.subscription : (invoice.subscription?.id || null);
+      const planName = planFromLine || (user.subscription_plan === 'yearly' ? 'Pro Yearly' : user.subscription_plan === 'monthly' ? 'Pro Monthly' : 'Pro');
+      
+      return {
+        id: invoice.id,
+        invoice_number: invoice.number || invoice.id,
+        created_at: new Date(invoice.created * 1000),
+        amount: invoice.amount_paid,
+        amount_formatted: formatStripeAmount(invoice.amount_paid, invoice.currency),
+        currency: (invoice.currency || 'usd').toUpperCase(),
+        status: invoice.status,
+        invoice_pdf: invoice.invoice_pdf,
+        hosted_invoice_url: invoice.hosted_invoice_url,
+        subscription_id: subId,
+        period_start: invoice.period_start ? new Date(invoice.period_start * 1000) : null,
+        period_end: invoice.period_end ? new Date(invoice.period_end * 1000) : null,
+        subscription_plan: planName
+      };
+    });
 
-    // Prevent caching
     res.set({
       'Cache-Control': 'no-cache, no-store, must-revalidate',
       'Pragma': 'no-cache',
@@ -547,11 +559,16 @@ router.get('/payment-history', async (req, res) => {
     res.json({
       success: true,
       payments,
+      stripe_customer_id: user.stripe_customer_id,
+      subscription_id: user.subscription_id,
+      current_period_end: user.current_period_end,
+      subscription_plan: user.subscription_plan || getPlanName(user.subscription_plan),
+      created_at: user.created_at,
       timestamp: Date.now()
     });
 
   } catch (error) {
-    console.error('❌ Payment history error:', error);
+    console.error('Payment history error:', error);
     res.status(500).json({ 
       success: false, 
       error: error.message,
@@ -559,6 +576,13 @@ router.get('/payment-history', async (req, res) => {
     });
   }
 });
+
+function formatStripeAmount(cents, currency = 'usd') {
+  const amount = (cents / 100).toFixed(2);
+  const symbols = { usd: '$', eur: '€', gbp: '£' };
+  const symbol = symbols[currency?.toLowerCase()] || currency?.toUpperCase() + ' ';
+  return symbol + amount;
+}
 
 // Get usage statistics
 router.get('/usage-stats', async (req, res) => {

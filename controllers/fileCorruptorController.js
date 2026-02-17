@@ -1,9 +1,11 @@
 const fs = require('fs').promises;
+const fsSync = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const Logger = require('../services/logger');
 const archiver = require('archiver');
 const User = require('../models/User');
+const { getSingleFileLimits } = require('../config/limits');
 
 // Helper function for formatting bytes
 function formatBytes(bytes) {
@@ -39,7 +41,7 @@ class FileCorruptorController {
           const user = await User.getById(req.session.userId);
           if (user && user.is_pro === 1) {
             isProUser = true;
-            userMaxFiles = 999; // Unlimited for Pro users
+            userMaxFiles = 20; // Pro: max 20 files per batch
             userMaxFileSize = 500 * 1024 * 1024; // 500MB for Pro users
           }
           
@@ -60,8 +62,8 @@ class FileCorruptorController {
         // Cleanup uploaded files
         req.files.forEach(file => {
           try {
-            if (fs.existsSync(file.path)) {
-              fs.unlinkSync(file.path);
+            if (fsSync.existsSync(file.path)) {
+              fsSync.unlinkSync(file.path);
             }
           } catch (err) {
             console.warn(`Cleanup error:`, err.message);
@@ -93,8 +95,8 @@ class FileCorruptorController {
           
           // Cleanup this file
           try {
-            if (fs.existsSync(file.path)) {
-              await fs.unlink(file.path);
+if (fsSync.existsSync(file.path)) {
+            await fs.unlink(file.path);
             }
           } catch (err) {
             console.warn(`Cleanup error:`, err.message);
@@ -106,8 +108,8 @@ class FileCorruptorController {
         // Cleanup any remaining valid files
         req.files.forEach(file => {
           try {
-            if (fs.existsSync(file.path)) {
-              fs.unlinkSync(file.path);
+            if (fsSync.existsSync(file.path)) {
+              fsSync.unlinkSync(file.path);
             }
           } catch (err) {
             console.warn(`Cleanup error:`, err.message);
@@ -182,8 +184,8 @@ class FileCorruptorController {
           
           // Cleanup temp file for failed file
           try {
-            if (fs.existsSync(file.path)) {
-              await fs.unlink(file.path);
+if (fsSync.existsSync(file.path)) {
+            await fs.unlink(file.path);
             }
           } catch (cleanupErr) {
             console.warn(`Cleanup error:`, cleanupErr.message);
@@ -260,7 +262,7 @@ class FileCorruptorController {
     }
   }
 
-  // Original single file method for backward compatibility - UPDATED
+  // Single file: free 2MB max, pro 100MB max (same pro/free pattern as other single-file tools)
   handleCorruptFile = async (req, res) => {
     try {
       if (!req.file) {
@@ -268,40 +270,25 @@ class FileCorruptorController {
         return res.status(400).json({ error: 'No file provided' });
       }
 
-      // ✅ ADDED: Check user subscription
-      let isProUser = false;
-      let userMaxFileSize = 100 * 1024 * 1024;
-      
-      if (req.session && req.session.userId) {
-        try {
-          const user = await User.getById(req.session.userId);
-          if (user && user.is_pro === 1) {
-            isProUser = true;
-            userMaxFileSize = 500 * 1024 * 1024;
-          }
-        } catch (userError) {
-          console.warn('User lookup error:', userError.message);
-        }
-      }
+      const isProUser = !!req.isProUser;
+      const { maxFileSize } = getSingleFileLimits(isProUser);
 
-      // ✅ ADDED: Check file size based on subscription
-      if (req.file.size > userMaxFileSize) {
+      if (req.file.size > maxFileSize) {
         try {
-          if (fs.existsSync(req.file.path)) {
+          if (fsSync.existsSync(req.file.path)) {
             await fs.unlink(req.file.path);
           }
         } catch (err) {
           console.warn(`Cleanup error:`, err.message);
         }
-        
         const errorMessage = isProUser
-          ? `File size exceeds ${formatBytes(userMaxFileSize)} limit for Pro users.`
-          : `File size exceeds ${formatBytes(userMaxFileSize)} limit for free users.`;
-        
-        return res.status(400).json({ 
+          ? `File size exceeds ${formatBytes(maxFileSize)} limit for Pro users.`
+          : `Free users: single file must be ≤2MB. "${req.file.originalname}" is ${formatBytes(req.file.size)}. Upgrade to Pro for files up to ${formatBytes(maxFileSize)}.`;
+        return res.status(400).json({
           error: errorMessage,
-          isProUser: isProUser,
-          maxFileSize: userMaxFileSize
+          errorCode: 'FILE_TOO_LARGE_FREE',
+          isProUser,
+          maxFileSize
         });
       }
 
@@ -466,8 +453,8 @@ class FileCorruptorController {
   cleanupTempFiles = (filePaths) => {
     filePaths.forEach(filePath => {
       try {
-        if (filePath && fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
+        if (filePath && fsSync.existsSync(filePath)) {
+          fsSync.unlinkSync(filePath);
           console.log(`Cleaned up: ${filePath}`);
         }
       } catch (err) {

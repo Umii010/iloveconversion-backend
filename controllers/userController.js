@@ -212,8 +212,7 @@ class UserController {
     }
   }
 
-  // Check authentication status
-  static async checkAuthStatus(req, res) {
+ static async checkAuthStatus(req, res) {
     try {
       console.log('🔍 Auth status check - Session ID:', req.sessionID);
       console.log('   User ID in session:', req.session.userId);
@@ -242,6 +241,7 @@ class UserController {
       }
 
       console.log('   ✅ User authenticated:', user.email);
+      console.log('   📊 User pro status:', user.is_pro); // Add this log
       
       res.status(200).json({
         success: true,
@@ -250,7 +250,8 @@ class UserController {
           id: Number(user.id),
           name: user.name,
           email: user.email,
-          country: user.country
+          country: user.country,
+          is_pro: user.is_pro  // ✅ ADD THIS LINE - include the pro status
         }
       });
       
@@ -474,9 +475,17 @@ class UserController {
   // Logout user
   static async logout(req, res) {
     try {
+      const wasLoggedIn = !!(req.session && req.session.userId);
+      if (!wasLoggedIn) {
+        return res.status(200).json({
+          success: true,
+          alreadyLoggedOut: true,
+          message: 'Already logged out'
+        });
+      }
+
       console.log('⬅️ Logout request for session:', req.sessionID);
-      
-      // Destroy session
+
       req.session.destroy((err) => {
         if (err) {
           console.error('Session destruction error:', err);
@@ -485,14 +494,13 @@ class UserController {
             error: 'Failed to logout'
           });
         }
-        
+
         console.log('✅ Session destroyed successfully');
         res.status(200).json({
           success: true,
           message: 'Logout successful'
         });
       });
-      
     } catch (error) {
       console.error('Logout error:', error);
       res.status(500).json({
@@ -604,23 +612,15 @@ class UserController {
   // Forgot Password
   static async forgotPassword(req, res) {
     try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          errors: errors.array()
+        });
+      }
+
       const { email } = req.body;
-
-      if (!email) {
-        return res.status(400).json({
-          success: false,
-          error: 'Email is required'
-        });
-      }
-
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email)) {
-        return res.status(400).json({
-          success: false,
-          error: 'Please enter a valid email address'
-        });
-      }
-
       const user = await User.findByEmail(email);
       
       // For security, we return the same message whether user exists or not
@@ -680,22 +680,15 @@ class UserController {
   // Reset Password
   static async resetPassword(req, res) {
     try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          errors: errors.array()
+        });
+      }
+
       const { token, password } = req.body;
-
-      if (!token || !password) {
-        return res.status(400).json({
-          success: false,
-          error: 'Token and new password are required'
-        });
-      }
-
-      // Validate token format (should be 64 hex characters)
-      if (!/^[a-f0-9]{64}$/.test(token)) {
-        return res.status(400).json({
-          success: false,
-          error: 'Invalid reset token format'
-        });
-      }
 
       // Find user by reset token
       const user = await User.findByResetToken(token);
@@ -712,26 +705,6 @@ class UserController {
         return res.status(400).json({
           success: false,
           error: 'Reset token has expired. Please request a new reset link.'
-        });
-      }
-
-      // Validate new password strength
-      if (password.length < 8) {
-        return res.status(400).json({
-          success: false,
-          error: 'Password must be at least 8 characters'
-        });
-      }
-      if (!/[A-Z]/.test(password)) {
-        return res.status(400).json({
-          success: false,
-          error: 'Password must contain at least one uppercase letter'
-        });
-      }
-      if (!/[0-9]/.test(password)) {
-        return res.status(400).json({
-          success: false,
-          error: 'Password must contain at least one number'
         });
       }
 

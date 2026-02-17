@@ -4,14 +4,14 @@ const fs = require('fs');
 const { exec } = require('child_process');
 const pdf = require('pdf-parse');
 const Logger = require('../services/logger');
-
+const { checkSingleFileLimit } = require('../config/limits');
 
 exports.pdfToWord = async (req, res) => {
   if (!req.file) {
-        Logger.logUsage(req, 'pdf_to_word', false).catch(() => {});
-
+    Logger.logUsage(req, 'pdf_to_word', false).catch(() => {});
     return res.status(400).json({ success: false, message: 'No PDF uploaded' });
   }
+  if (checkSingleFileLimit(req, res)) return;
 
   const inputPath = req.file.path;
   const originalName = path.parse(req.file.originalname).name;

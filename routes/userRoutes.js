@@ -34,9 +34,18 @@ const checkSubscription = require('../middleware/subscriptionCheck');
 const { 
   registerValidation, 
   loginValidation, 
+  forgotPasswordValidation,
+  resetPasswordValidation,
   updateUserValidation 
 } = require('../middleware/validation');
 
+const formatBytes = (bytes) => {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+};
 
 const requireAuth = (req, res, next) => {
   if (!req.session.userId) {
@@ -54,7 +63,9 @@ const storage = multer.diskStorage({
     cb(null, path.join(os.tmpdir()));
   },
   filename: (req, file, cb) => {
-    cb(null, file.originalname);
+    const base = path.basename(file.originalname || 'file').replace(/\.\./g, '');
+    const safeName = base.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 200);
+    cb(null, `${Date.now()}-${safeName}`);
   }
 });
 
@@ -131,8 +142,8 @@ router.post('/register', registerValidation, UserController.register);
 router.post('/login', loginValidation, UserController.login);
 
 // Forgot password routes
-router.post('/forgot-password', UserController.forgotPassword);
-router.post('/reset-password', UserController.resetPassword);
+router.post('/forgot-password', forgotPasswordValidation, UserController.forgotPassword);
+router.post('/reset-password', resetPasswordValidation, UserController.resetPassword);
 
 router.post('/logout', UserController.logout);
 router.post('/logout-all', UserController.logoutAll);
@@ -145,25 +156,55 @@ router.delete('/users/:id', UserController.deleteUser);
 
 
 
-//Routes
-router.post('/compress-pdf', checkSubscription, (req, res, next) => {
-  // Adjust multer limits based on subscription
-  const maxFiles = req.isProUser ? 999 : 15;
-  
-  upload.array('pdf', maxFiles)(req, res, (err) => {
-    if (err) {
-      return res.status(400).json({
-        success: false,
-        message: err.message,
-        errorCode: 'UPLOAD_ERROR'
-      });
-    }
-    next();
-  });
-}, compresspdfController.compressPdf);
+// In your routes file - make sure it's identical to merge-pdf
+// Compress PDF: free 7 files / 7MB total, pro 20 files / 20MB total
+router.post('/compress-pdf',
+  checkSubscription,
+  (req, res, next) => {
+    const { getBatchLimits } = require('../config/limits');
+    const { maxFiles, maxTotalSize } = getBatchLimits(!!req.isProUser);
+    const maxPerFile = Math.max(maxTotalSize, 20 * 1024 * 1024);
+    const dynamicUpload = upload.array('pdf', maxFiles);
+    dynamicUpload(req, res, (err) => {
+      if (err) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).json({
+            success: false,
+            message: `File too large. Free: 7 files, 7MB total. Pro: 20MB total.`,
+            errorCode: 'FILE_TOO_LARGE'
+          });
+        }
+        if (err.code === 'LIMIT_FILE_COUNT') {
+          return res.status(400).json({
+            success: false,
+            message: `Maximum ${maxFiles} files allowed.`,
+            errorCode: 'MAX_FILES_EXCEEDED',
+            maxFiles
+          });
+        }
+        return res.status(400).json({ success: false, message: err.message, errorCode: 'UPLOAD_ERROR' });
+      }
+      next();
+    });
+  },
+  compresspdfController.compressPdf
+);
+
+// Unified download: compress tokens (global.downloadTokens) first, then merge (qrService)
+router.get('/download/:token', (req, res, next) => {
+  const isCompressToken = global.downloadTokens && global.downloadTokens.has(req.params.token);
+  if (isCompressToken) return compresspdfController.downloadCompressedFile(req, res);
+  return mergePdfController.downloadViaQR(req, res);
+});
+router.get('/compress-pdf/preview/:token', checkSubscription, compresspdfController.generatePreview);
+router.post('/compress-pdf/process/:token', checkSubscription, compresspdfController.processPDF);
+
+
 
 router.post('/merge-pdf', checkSubscription, (req, res, next) => {
-  const maxFiles = req.isProUser ? 999 : 7;
+  const { getBatchLimits } = require('../config/limits');
+  const { maxFiles: batchMaxFiles, maxTotalSize } = getBatchLimits(!!req.isProUser);
+  const maxFiles = batchMaxFiles;
   const maxSize = req.isProUser ? 500 * 1024 * 1024 : 5 * 1024 * 1024; 
   const dynamicUpload = upload.array('files', maxFiles);
   
@@ -201,24 +242,6 @@ router.post('/merge-pdf', checkSubscription, (req, res, next) => {
     next();
   });
 }, mergePdfController.mergePdfs);
-
-
-router.get('/download/:token', (req, res) => {
-  // Handle preflight (OPTIONS) requests
-  if (req.method === 'OPTIONS') {
-    res.set({
-      'Access-Control-Allow-Origin': req.headers.origin || 'http://192.168.18.62:5173',
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, Cache-Control, Pragma, Accept',
-      'Access-Control-Allow-Credentials': 'true',
-      'Access-Control-Max-Age': '86400'
-    });
-    return res.sendStatus(200);
-  }
-
-  // Handle actual GET requests
-  return mergePdfController.downloadViaQR(req, res);
-});
 
 router.get('/qr-status/:token', mergePdfController.checkQRStatus);
 router.post(
@@ -285,10 +308,9 @@ router.post(
   mergePdfController.processPDF
 );
 
-router.post('/pdf-to-word', upload.single('file'), pdfToWordController.pdfToWord);
-
+router.post('/pdf-to-word', checkSubscription, upload.single('file'), pdfToWordController.pdfToWord);
 router.post('/word-to-pdf', upload.single('file'), wordToPdfController.wordToPdf);
-router.post('/pdf-to-png', upload.single('file'), pdfToPngController.pdfToPng);
+router.post('/pdf-to-png', checkSubscription, upload.single('file'), pdfToPngController.pdfToPng);
 router.post('/image-to-pdf', 
   checkSubscription,
   (req, res, next) => {
@@ -315,76 +337,22 @@ router.post('/image-to-pdf',
   },
   imageToPdfController.imageToPdf
 );
-router.post('/ppt-to-pdf',upload.single('file'),pptToPdfController.pptToPdf);
+router.post('/ppt-to-pdf', checkSubscription, upload.single('file'), pptToPdfController.pptToPdf);
 router.post( '/rotate-pdf',upload.array('files', 10),rotatePdfController.rotatePdf);
-router.post('/corrupt-files', checkSubscription, (req, res, next) => {
-  // Set limits based on subscription
-  const maxFiles = req.isProUser ? 999 : 10;
-  const maxFileSize = req.isProUser ? 500 * 1024 * 1024 : 100 * 1024 * 1024;
-  
-  // Configure multer with dynamic limits
-  const dynamicUpload = multer({
-    storage: multer.diskStorage({
-      destination: (req, file, cb) => {
-        const uploadDir = path.join(__dirname, '../uploads');
-        if (!fs.existsSync(uploadDir)) {
-          fs.mkdirSync(uploadDir, { recursive: true });
-        }
-        cb(null, uploadDir);
-      },
-      filename: (req, file, cb) => {
-        const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(7)}${path.extname(file.originalname)}`;
-        cb(null, uniqueName);
-      }
-    }),
-    limits: {
-      fileSize: maxFileSize,
-      files: maxFiles
-    },
-    fileFilter: (req, file, cb) => {
-      // Accept all files for corruption
-      cb(null, true);
-    }
-  });
-  
-  dynamicUpload.array('files', maxFiles)(req, res, (err) => {
-    if (err) {
-      if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(400).json({
-          success: false,
-          error: `File too large. Maximum size: ${formatBytes(maxFileSize)}`,
-          maxFileSize: maxFileSize,
-          isProUser: req.isProUser
-        });
-      }
-      if (err.code === 'LIMIT_FILE_COUNT') {
-        return res.status(400).json({
-          success: false,
-          error: `Too many files. Maximum: ${maxFiles}`,
-          maxFiles: maxFiles,
-          isProUser: req.isProUser
-        });
-      }
-      return res.status(400).json({
-        success: false,
-        error: err.message
-      });
-    }
-    next();
-  });
-}, FileCorruptorController.handleCorruptFiles);
-router.post('/unlock-pdf', upload.array('files', 10),unlockPdfController.unlockPdf);
-router.post('/pdf-to-excel',upload.single('file'),pdfToExcelController.pdfToExcel);
+// Corrupt: single file only — free ≤2MB, pro up to 100MB
+router.post('/corrupt-files', checkSubscription, upload.single('file'), FileCorruptorController.handleCorruptFile);
+router.post('/unlock-pdf', checkSubscription, upload.single('file'), unlockPdfController.unlockPdf);
+router.post('/pdf-to-excel', checkSubscription, upload.single('file'), pdfToExcelController.pdfToExcel);
 router.post('/html-to-pdf', htmlToPdfController.htmlToPdf);
-router.post('/pdf-to-ppt',upload.single('file'),pdfToPptController.pdfToPpt);
-router.post('/repair-pdf',upload.single('file'),repairPdfController.repairPdf);
+router.post('/pdf-to-ppt', checkSubscription, upload.single('file'), pdfToPptController.pdfToPpt);
+router.post('/repair-pdf', checkSubscription, upload.single('file'), repairPdfController.repairPdf);
 router.post('/sign-pdf',upload.fields([{ name: 'file', maxCount: 1 }, { name: 'signatureFile', maxCount: 1 }]),(req, res) => {req.body.signatureFile = req.files['signatureFile'][0].path; signPdfController.signPdf(req,res);});
 
 router.post('/organize-pdf', upload.single('file'), organizePdfController.organizePdf);
 router.post('/crop-pdf', upload.single('file'), cropPdfController.cropPdf);
 router.post('/add-page-numbers', upload.single('file'), addPageNumbersController.addPageNumbers);
-router.post('/protect-pdf', upload.single('file'), protectPdfController.protectPdf);
-router.post('/ocr-pdf', upload.single('file'), ocrPdfController.ocrPdf);
+router.post('/protect-pdf', checkSubscription, upload.single('file'), protectPdfController.protectPdf);
+router.post('/ocr-pdf', checkSubscription, upload.single('file'), ocrPdfController.ocrPdf);
 router.post('/process-code', minifyController.processCode);
 
 
